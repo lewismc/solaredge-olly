@@ -1,34 +1,8 @@
-diff --git a/main.go b/main.go
---- a/main.go
-+++ b/main.go
-@@ -135,6 +135,7 @@
- 	err := handler.Connect()
- 	if err != nil {
- 		log.Error().Msgf("[%s] Error connecting to Inverter: %s", target, err.Error())
-+		exporter.Modbus_Read_OK.WithLabelValues(target).Set(0)
- 	}
- 	client := modbus.NewClient(handler)
- 	defer handler.Close()
-@@ -165,6 +166,7 @@
- 
- 	// Collect logs forever
- 	for {
-+		exporter.Modbus_Read_OK.WithLabelValues(target).Set(0)
- 		inverterData, err := client.ReadHoldingRegisters(40069, 40)
- 		if err != nil {
- 			log.Error().Msgf("[%s] Error reading holding registers: %s", target, err.Error())
-@@ -180,6 +182,7 @@
- 			continue
- 		}
- 		setMetrics(id, target)
-+		exporter.Modbus_Read_OK.WithLabelValues(target).Set(1)
- 
- 		if !metersDetected {
- 			activeMeters, metersDetected = detectMeters(client, target, len(meterMetrics))
 diff --git a/exporter/metrics.go b/exporter/metrics.go
+index 1087b1d..ba3c4c2 100644
 --- a/exporter/metrics.go
 +++ b/exporter/metrics.go
-@@ -153,6 +153,9 @@
+@@ -153,6 +153,9 @@ var (
  		Name: "Inverter_Info",
  		Help: "1 for the SunSpec common-block identity of an inverter",
  	}, []string{"inverter", "manufacturer", "model", "serial", "version"})
@@ -38,3 +12,35 @@ diff --git a/exporter/metrics.go b/exporter/metrics.go
  )
  
  // MeterMetrics holds the full set of gauges for a single meter. Meter 1 uses
+diff --git a/main.go b/main.go
+index 4b87051..9697b32 100644
+--- a/main.go
++++ b/main.go
+@@ -135,6 +135,7 @@ func runCollection(target string, meterMetrics []*exporter.MeterMetrics) {
+ 	err := handler.Connect()
+ 	if err != nil {
+ 		log.Error().Msgf("[%s] Error connecting to Inverter: %s", target, err.Error())
++		exporter.Modbus_Read_OK.WithLabelValues(target).Set(0)
+ 	}
+ 	client := modbus.NewClient(handler)
+ 	defer handler.Close()
+@@ -168,6 +169,7 @@ func runCollection(target string, meterMetrics []*exporter.MeterMetrics) {
+ 		inverterData, err := client.ReadHoldingRegisters(40069, 40)
+ 		if err != nil {
+ 			log.Error().Msgf("[%s] Error reading holding registers: %s", target, err.Error())
++			exporter.Modbus_Read_OK.WithLabelValues(target).Set(0)
+ 			log.Error().Msgf("[%s] Attempting to reconnect", target)
+ 			_ = handler.Close()
+ 			time.Sleep(7 * time.Second)
+@@ -177,9 +179,11 @@ func runCollection(target string, meterMetrics []*exporter.MeterMetrics) {
+ 		id, err := solaredge.NewInverterModel(inverterData)
+ 		if err != nil {
+ 			log.Error().Msgf("[%s] Error parsing data: %s", target, err.Error())
++			exporter.Modbus_Read_OK.WithLabelValues(target).Set(0)
+ 			continue
+ 		}
+ 		setMetrics(id, target)
++		exporter.Modbus_Read_OK.WithLabelValues(target).Set(1)
+ 
+ 		if !metersDetected {
+ 			activeMeters, metersDetected = detectMeters(client, target, len(meterMetrics))

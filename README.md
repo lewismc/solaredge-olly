@@ -59,7 +59,7 @@ Grafana Cloud logs. This is a different URL and instance id from the Prometheus 
 - `GRAFANA_CLOUD_LOKI_USERNAME` is the stack's Loki instance id
 - `GRAFANA_CLOUD_LOKI_PASSWORD` is an access-policy token with `logs:write`. It can be the same token as `GRAFANA_CLOUD_PROM_PASSWORD` when that policy includes both scopes.
 
-Those values are passed into Alloy as environment variables. They are not written into `config.alloy`.
+Those values are passed into Alloy as environment variables. They are not written into `alloy/config.alloy`.
 
 Synthetic Monitoring. Both variables are required, and `docker compose` fails until they are set:
 
@@ -106,7 +106,7 @@ Stop the stack with `docker compose --profile sim down` when the simulator was s
 
 ## Module
 
-Scrape settings, the keep-list, and the `forward_to` receiver live in [`module/metrics.alloy`](module/metrics.alloy). The default keep-list is `up`, `SunSpec_*`, `AC_*`, `DC_*`, `Temp_*`, `Status*`, `Inverter_Info`, `M_*`, `M2_*`, and `M3_*`. Exporter `go_*` series are dropped. See [`module/README.md`](module/README.md). Exporter log shipping lives in [`config.alloy`](config.alloy), not in that module.
+Scrape settings, the keep-list, and the `forward_to` receiver live in [`module/metrics.alloy`](module/metrics.alloy). The default keep-list is `up`, `SunSpec_*`, `AC_*`, `DC_*`, `Temp_*`, `Status*`, `Inverter_Info`, `M_*`, `M2_*`, and `M3_*`. Exporter `go_*` series are dropped. See [`module/README.md`](module/README.md). Exporter log shipping lives in [`alloy/config.alloy`](alloy/config.alloy), not in that module.
 
 ## Dashboard
 
@@ -140,7 +140,7 @@ gcx resources push alertrules -p alerting
 
 ## Fleet Management
 
-[`config.alloy`](config.alloy) is how this example runs. [`fleet/solaredge.alloy`](fleet/solaredge.alloy) is that same pipeline for a reader who turns Fleet Management on. This repository does not publish a catalog entry, and Compose does not load the fleet file.
+[`alloy/config.alloy`](alloy/config.alloy) is how this example runs. [`fleet/solaredge.alloy`](fleet/solaredge.alloy) is that same pipeline for a reader who turns Fleet Management on. This repository does not publish a catalog entry, and Compose does not load the fleet file.
 
 The collector's local config is only the bootstrap. The module stays mounted at `/etc/alloy/module/metrics.alloy`, which the remote pipeline imports. Secrets stay in the environment.
 
@@ -161,7 +161,7 @@ remotecfg {
 }
 ```
 
-`FLEET_MANAGEMENT_HOST` is the host on the stack's Fleet Management page. The remote pipeline is the contents of `fleet/solaredge.alloy`. Match it to collectors with the attributes you set here. Readers without Fleet Management leave Compose on `config.alloy`.
+`FLEET_MANAGEMENT_HOST` is the host on the stack's Fleet Management page. The remote pipeline is the contents of `fleet/solaredge.alloy`. Match it to collectors with the attributes you set here. Readers without Fleet Management leave Compose on `alloy/config.alloy`.
 
 ## Synthetic monitoring
 
@@ -199,7 +199,7 @@ done
 Each chapter gets its own directory when it is implemented.
 
 1. **Alerts** in [`alerting/`](alerting/). Implemented.
-2. **Fleet Management** in [`fleet/solaredge.alloy`](fleet/solaredge.alloy), optional. Implemented. [`config.alloy`](config.alloy) stays the way this example runs.
+2. **Fleet Management** in [`fleet/solaredge.alloy`](fleet/solaredge.alloy), optional. Implemented. [`alloy/config.alloy`](alloy/config.alloy) stays the way this example runs.
 3. **Synthetic monitoring** in [`synthetic/`](synthetic/). Implemented. The private probe starts with `docker compose up`. The k6 check does not prove the inverter answered the latest poll.
 4. **SLOs** in [`slo/`](slo/). Implemented. Poll success, and fault-free among successful polls. No energy SLO.
 5. **Geolocation and expected yield** in [`geolocate/`](geolocate/). Implemented. No alert or SLO on expected yield yet.

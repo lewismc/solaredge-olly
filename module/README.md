@@ -2,7 +2,7 @@
 
 Scrapes SolarEdge inverter and meter metrics exposed by a local Prometheus exporter that polls the inverter over Modbus TCP using the SunSpec protocol ([dave92082/SolarEdge-Exporter](https://github.com/dave92082/SolarEdge-Exporter) `1.2.1`).
 
-This module does not speak Modbus. The Compose stack in the repository root runs the exporter, then Alloy loads this file with `import.file` and scrapes `/metrics` (default port `2112`). This module is the scrape. Exporter log shipping lives in `config.alloy`.
+This module does not speak Modbus. The Compose stack in the repository root runs the exporter, then Alloy loads this file with `import.file` and scrapes `/metrics` (default port `2112`). This module is the scrape. Exporter log shipping lives in `alloy/config.alloy`.
 
 ## Applicable Alloy versions
 
@@ -111,7 +111,7 @@ prometheus.remote_write "metrics" {
 }
 ```
 
-`config.alloy` in the repository root is that wiring for the Compose stack.
+`alloy/config.alloy` in the repository is that wiring for the Compose stack.
 
 ## Sample PromQL
 
