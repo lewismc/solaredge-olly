@@ -1,0 +1,34 @@
+diff --git a/exporter/metrics.go b/exporter/metrics.go
+--- a/exporter/metrics.go
++++ b/exporter/metrics.go
+@@ -147,6 +147,12 @@
+ 
+ 	Status_Vendor = newGauge("Status_Vendor",
+ 		"Vendor-defined operating state and error codes. For error description, meaning and troubleshooting, refer to the SolarEdge Installation Guide.")
++
++	// Identity is a string, so it cannot use newGauge, which only labels by inverter.
++	Inverter_Info = promauto.NewGaugeVec(prometheus.GaugeOpts{
++		Name: "Inverter_Info",
++		Help: "1 for the SunSpec common-block identity of an inverter",
++	}, []string{"inverter", "manufacturer", "model", "serial", "version"})
+ )
+ 
+ // MeterMetrics holds the full set of gauges for a single meter. Meter 1 uses
+diff --git a/main.go b/main.go
+--- a/main.go
++++ b/main.go
+@@ -147,6 +147,14 @@
+ 	cm, err := solaredge.NewCommonModel(infoData)
+ 	if err != nil {
+ 		log.Error().Msgf("[%s] Error parsing inverter common block: %s", target, err.Error())
++	} else {
++		exporter.Inverter_Info.WithLabelValues(
++			target,
++			strings.TrimSpace(string(cm.C_Manufacturer)),
++			strings.TrimSpace(string(cm.C_Model)),
++			strings.TrimSpace(string(cm.C_SerialNumber)),
++			strings.TrimSpace(string(cm.C_Version)),
++		).Set(1)
+ 	}
+ 	log.Info().Msgf("[%s] Inverter Model: %s", target, cm.C_Model)
+ 	log.Info().Msgf("[%s] Inverter Serial: %s", target, cm.C_SerialNumber)

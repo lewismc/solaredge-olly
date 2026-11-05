@@ -1,0 +1,50 @@
+# Fault-free among successful polls. Freeform, because a stale Status during a
+# dead session must not count as good. Sleeping (Status == 2) is good.
+# Both sides use $__rate_interval. Literal ranges are rejected.
+# metadata.name stays empty so a reader does not adopt one stack's UUID.
+apiVersion: slo.ext.grafana.app/v1alpha1
+kind: SLO
+metadata: {}
+spec:
+  name: SolarEdge fault-free polls
+  description: Among polls that published the inverter model, fraction where Status is not Fault (7).
+  labels:
+    - key: service_name
+      value: solaredge
+  destinationDatasource:
+    uid: grafanacloud-prom
+  query:
+    type: freeform
+    freeform:
+      query: |
+        sum by (inverter) (
+          avg_over_time(
+            (
+              (Modbus_Read_OK{job="integrations/solaredge"} == bool 1)
+              * on(inverter)
+              (Status{job="integrations/solaredge"} != bool 7)
+            )[$__rate_interval:]
+          )
+        )
+        /
+        sum by (inverter) (
+          avg_over_time(
+            (Modbus_Read_OK{job="integrations/solaredge"} == bool 1)[$__rate_interval:]
+          )
+        )
+  objectives:
+    - value: 0.99
+      window: 28d
+  alerting:
+    fastBurn:
+      annotations:
+        - key: summary
+          value: SolarEdge fault-free polls are burning the error budget quickly.
+      enrichments:
+        - type: assistantInvestigation
+    slowBurn:
+      annotations:
+        - key: summary
+          value: SolarEdge fault-free polls are burning the error budget slowly.
+      enrichments:
+        - type: assistantInvestigation

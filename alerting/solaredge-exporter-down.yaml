@@ -1,0 +1,54 @@
+# Grafana-managed rule. No contact point is committed; attach your own receiver.
+# Set grafana.app/folder (label and annotation) to your folder UID before pushing.
+# Prometheus UID grafanacloud-prom and Loki UID grafanacloud-logs are the Grafana
+# Cloud defaults. Replace them if your stack uses different UIDs.
+# gcx resources push reads one resource per file.
+# up == 0 is the scrape of :2112. Poll failure is Modbus_Read_OK, a separate rule.
+apiVersion: rules.alerting.grafana.app/v0alpha1
+kind: AlertRule
+metadata:
+  name: solaredge-exporter-down
+  labels:
+    grafana.app/folder: YOUR_FOLDER_UID
+  annotations:
+    grafana.app/folder: YOUR_FOLDER_UID
+spec:
+  title: SolarEdge exporter down
+  for: 5m0s
+  noDataState: Alerting
+  execErrState: Error
+  trigger:
+    interval: 1m0s
+  annotations:
+    summary: SolarEdge exporter scrape is down (up == 0).
+  # The query keeps the up series. Threshold < 1 is up == 0.
+  # A filtered `up == 0` query is empty while the exporter is up, and
+  # noDataState Alerting would fire on that empty result.
+  expressions:
+    A:
+      datasourceUID: grafanacloud-prom
+      queryType: instant
+      relativeTimeRange:
+        from: 5m0s
+        to: 0s
+      model:
+        expr: up{job="integrations/solaredge"}
+        instant: true
+        intervalMs: 1000
+        maxDataPoints: 43200
+        queryType: instant
+        refId: A
+    B:
+      source: true
+      model:
+        type: threshold
+        expression: A
+        refId: B
+        intervalMs: 1000
+        maxDataPoints: 43200
+        conditions:
+          - evaluator:
+              type: lt
+              params:
+                - 1
+            type: lt

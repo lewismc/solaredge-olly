@@ -1,0 +1,40 @@
+# Poll success. Threshold is the gauge form of "fraction of intervals at 1".
+# A ratio query wraps counters with rate(), which stays near 0 on this gauge.
+# metadata.name stays empty so a reader does not adopt one stack's UUID.
+# gcx resources push reads one resource per file.
+apiVersion: slo.ext.grafana.app/v1alpha1
+kind: SLO
+metadata: {}
+spec:
+  name: SolarEdge poll success
+  description: Fraction of polls where the inverter model block was published.
+  labels:
+    - key: service_name
+      value: solaredge
+  destinationDatasource:
+    uid: grafanacloud-prom
+  query:
+    type: threshold
+    threshold:
+      thresholdExpression: Modbus_Read_OK{job="integrations/solaredge"}
+      groupByLabels:
+        - inverter
+      threshold:
+        value: 1
+        operator: ">="
+  objectives:
+    - value: 0.99
+      window: 28d
+  alerting:
+    fastBurn:
+      annotations:
+        - key: summary
+          value: SolarEdge poll success is burning the error budget quickly.
+      enrichments:
+        - type: assistantInvestigation
+    slowBurn:
+      annotations:
+        - key: summary
+          value: SolarEdge poll success is burning the error budget slowly.
+      enrichments:
+        - type: assistantInvestigation

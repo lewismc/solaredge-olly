@@ -1,0 +1,83 @@
+// SolarEdge collector.
+//
+// Loads the module shipped in this repository. Grafana Cloud credentials come from
+// the process environment and are never written into this file.
+
+import.file "solaredge" {
+	filename = "/etc/alloy/module/metrics.alloy"
+}
+
+prometheus.remote_write "cloud" {
+	endpoint {
+		url = sys.env("GRAFANA_CLOUD_PROM_URL")
+
+		basic_auth {
+			username = sys.env("GRAFANA_CLOUD_PROM_USERNAME")
+			password = sys.env("GRAFANA_CLOUD_PROM_PASSWORD")
+		}
+	}
+}
+
+solaredge.local "exporter" {
+	exporter_address = "solaredge-exporter:2112"
+}
+
+solaredge.scrape "inverter" {
+	targets    = solaredge.local.exporter.output
+	forward_to = [prometheus.remote_write.cloud.receiver]
+}
+
+// Site location and expected yield from solaredge-geolocate. A separate job, so
+// the inverter alerts and SLOs on integrations/solaredge do not change.
+solaredge.local "geolocate" {
+	exporter_address = "solaredge-geolocate:9110"
+}
+
+solaredge.scrape "geolocate" {
+	targets      = solaredge.local.geolocate.output
+	job_label    = "integrations/solaredge-geolocate"
+	keep_metrics = "(up|Site_.+)"
+	forward_to   = [prometheus.remote_write.cloud.receiver]
+}
+
+// The exporter appends JSON lines to a shared volume. loki.source.file records
+// a byte offset, so a restart continues after the last byte. The Docker log
+// API cursor is only a unix second and is keyed by the label set, so a restart
+// or a label change ships lines that were already sent.
+// Stream labels are service_name and job. job matches the scrape job, so a
+// metric and its logs share a selector. The inverter address stays in the
+// line body; it moves with the DHCP lease.
+
+local.file_match "exporter" {
+	path_targets = [{
+		__path__     = "/var/log/solaredge/solaredge-exporter.log",
+		job          = "integrations/solaredge",
+		service_name = "solaredge-exporter",
+	}]
+}
+
+loki.source.file "exporter" {
+	targets    = local.file_match.exporter.targets
+	forward_to = [loki.process.exporter.receiver]
+}
+
+loki.process "exporter" {
+	stage.label_keep {
+		values = ["service_name", "job"]
+	}
+
+	forward_to = [loki.write.cloud.receiver]
+}
+
+loki.write "cloud" {
+	endpoint {
+		url = sys.env("GRAFANA_CLOUD_LOKI_URL")
+
+		basic_auth {
+			username = sys.env("GRAFANA_CLOUD_LOKI_USERNAME")
+			password = sys.env("GRAFANA_CLOUD_LOKI_PASSWORD")
+		}
+	}
+}
+
+livedebugging { }

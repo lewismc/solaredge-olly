@@ -1,0 +1,55 @@
+# Grafana-managed rule. No contact point is committed; attach your own receiver.
+# Set grafana.app/folder (label and annotation) to your folder UID before pushing.
+# Sleeping (Status == 2) keeps the series and does not match == 7.
+apiVersion: rules.alerting.grafana.app/v0alpha1
+kind: AlertRule
+metadata:
+  name: solaredge-inverter-fault
+  labels:
+    grafana.app/folder: YOUR_FOLDER_UID
+  annotations:
+    grafana.app/folder: YOUR_FOLDER_UID
+spec:
+  title: SolarEdge inverter fault
+  for: 5m0s
+  noDataState: Ok
+  execErrState: Error
+  trigger:
+    interval: 1m0s
+  annotations:
+    summary: SolarEdge inverter Status is Fault (7). Sleeping (2) is healthy.
+  expressions:
+    A:
+      datasourceUID: grafanacloud-prom
+      queryType: instant
+      relativeTimeRange:
+        from: 5m0s
+        to: 0s
+      model:
+        expr: Status{job="integrations/solaredge"}
+        instant: true
+        intervalMs: 1000
+        maxDataPoints: 43200
+        queryType: instant
+        refId: A
+    B:
+      model:
+        type: math
+        expression: $A == 7
+        refId: B
+        intervalMs: 1000
+        maxDataPoints: 43200
+    C:
+      source: true
+      model:
+        type: threshold
+        expression: B
+        refId: C
+        intervalMs: 1000
+        maxDataPoints: 43200
+        conditions:
+          - evaluator:
+              type: gt
+              params:
+                - 0
+            type: gt
