@@ -1,8 +1,16 @@
 diff --git a/main.go b/main.go
-index 9697b32..436abc8 100644
+index 6b9e0f7..f9a4b31 100644
 --- a/main.go
 +++ b/main.go
-@@ -134,7 +134,7 @@ func runCollection(target string, meterMetrics []*exporter.MeterMetrics) {
+@@ -27,6 +27,7 @@ import (
+ 	"SolarEdge-Exporter/config"
+ 	"SolarEdge-Exporter/exporter"
+ 	"SolarEdge-Exporter/solaredge"
++	"errors"
+ 	"fmt"
+ 	"io"
+ 	"math"
+@@ -134,7 +135,7 @@ func runCollection(target string, meterMetrics []*exporter.MeterMetrics) {
  	handler.SlaveId = byte(viper.GetInt("SolarEdge.ClientId"))
  	err := handler.Connect()
  	if err != nil {
@@ -11,16 +19,22 @@ index 9697b32..436abc8 100644
  		exporter.Modbus_Read_OK.WithLabelValues(target).Set(0)
  	}
  	client := modbus.NewClient(handler)
-@@ -143,7 +143,7 @@ func runCollection(target string, meterMetrics []*exporter.MeterMetrics) {
+@@ -143,12 +144,12 @@ func runCollection(target string, meterMetrics []*exporter.MeterMetrics) {
  	// Collect and log common inverter data
  	infoData, err := client.ReadHoldingRegisters(40000, 70)
  	if err != nil {
 -		log.Error().Msgf("[%s] Error reading inverter common block: %s", target, err.Error())
 +		withReadErrorFields(log.Error(), target, "common_block", err).Msgf("[%s] Error reading inverter common block: %s", target, err.Error())
+ 		exporter.Modbus_Read_OK.WithLabelValues(target).Set(0)
  	}
  	cm, err := solaredge.NewCommonModel(infoData)
  	if err != nil {
-@@ -168,7 +168,7 @@ func runCollection(target string, meterMetrics []*exporter.MeterMetrics) {
+-		log.Error().Msgf("[%s] Error parsing inverter common block: %s", target, err.Error())
++		withReadErrorFields(log.Error(), target, "common_block", err).Msgf("[%s] Error parsing inverter common block: %s", target, err.Error())
+ 		exporter.Modbus_Read_OK.WithLabelValues(target).Set(0)
+ 	} else {
+ 		exporter.Inverter_Info.WithLabelValues(
+@@ -170,7 +171,7 @@ func runCollection(target string, meterMetrics []*exporter.MeterMetrics) {
  	for {
  		inverterData, err := client.ReadHoldingRegisters(40069, 40)
  		if err != nil {
@@ -29,7 +43,16 @@ index 9697b32..436abc8 100644
  			exporter.Modbus_Read_OK.WithLabelValues(target).Set(0)
  			log.Error().Msgf("[%s] Attempting to reconnect", target)
  			_ = handler.Close()
-@@ -192,7 +192,7 @@ func runCollection(target string, meterMetrics []*exporter.MeterMetrics) {
+@@ -180,7 +181,7 @@ func runCollection(target string, meterMetrics []*exporter.MeterMetrics) {
+ 		}
+ 		id, err := solaredge.NewInverterModel(inverterData)
+ 		if err != nil {
+-			log.Error().Msgf("[%s] Error parsing data: %s", target, err.Error())
++			withReadErrorFields(log.Error(), target, "poll", err).Msgf("[%s] Error parsing data: %s", target, err.Error())
+ 			exporter.Modbus_Read_OK.WithLabelValues(target).Set(0)
+ 			continue
+ 		}
+@@ -194,12 +195,12 @@ func runCollection(target string, meterMetrics []*exporter.MeterMetrics) {
  		for i := range activeMeters {
  			meterData, err := client.ReadHoldingRegisters(uint16(meterDataBase+i*meterBlockLength), 105)
  			if err != nil {
@@ -38,7 +61,21 @@ index 9697b32..436abc8 100644
  				break
  			}
  			mt, err := solaredge.NewMeterModel(meterData)
-@@ -237,7 +237,7 @@ func detectMeters(client modbus.Client, target string, numMeters int) (int, bool
+ 			if err != nil {
+-				log.Error().Msgf("[%s] Error parsing meter %d data: %s", target, i+1, err.Error())
++				withReadErrorFields(log.Error(), target, "meter_read", err).Msgf("[%s] Error parsing meter %d data: %s", target, i+1, err.Error())
+ 				break
+ 			}
+ 			log.Debug().Msgf("[%s] Meter %d AC Current: %f", target, i+1, float64(mt.M_AC_Current)*math.Pow(10, float64(mt.M_AC_Current_SF)))
+@@ -233,13 +234,14 @@ func detectMeters(client modbus.Client, target string, numMeters int) (int, bool
+ 	for i := range numMeters {
+ 		meterInfoData, err := client.ReadHoldingRegisters(uint16(meterCommonBase+i*meterBlockLength), 65)
+ 		if err != nil {
+-			if _, isModbusError := err.(*modbus.ModbusError); isModbusError {
++			var mbErr *modbus.ModbusError
++			if errors.As(err, &mbErr) {
+ 				// The inverter answered with an exception: the meter block
+ 				// is not readable, i.e. the meter is not enabled.
  				log.Info().Msgf("[%s] Meter %d not enabled (%s), skipping meter collection for it", target, i+1, err.Error())
  				break
  			}
