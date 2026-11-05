@@ -1,0 +1,307 @@
+diff --git a/main.go b/main.go
+index 9697b32..436abc8 100644
+--- a/main.go
++++ b/main.go
+@@ -134,7 +134,7 @@ func runCollection(target string, meterMetrics []*exporter.MeterMetrics) {
+ 	handler.SlaveId = byte(viper.GetInt("SolarEdge.ClientId"))
+ 	err := handler.Connect()
+ 	if err != nil {
+-		log.Error().Msgf("[%s] Error connecting to Inverter: %s", target, err.Error())
++		withReadErrorFields(log.Error(), target, "connect", err).Msgf("[%s] Error connecting to Inverter: %s", target, err.Error())
+ 		exporter.Modbus_Read_OK.WithLabelValues(target).Set(0)
+ 	}
+ 	client := modbus.NewClient(handler)
+@@ -143,7 +143,7 @@ func runCollection(target string, meterMetrics []*exporter.MeterMetrics) {
+ 	// Collect and log common inverter data
+ 	infoData, err := client.ReadHoldingRegisters(40000, 70)
+ 	if err != nil {
+-		log.Error().Msgf("[%s] Error reading inverter common block: %s", target, err.Error())
++		withReadErrorFields(log.Error(), target, "common_block", err).Msgf("[%s] Error reading inverter common block: %s", target, err.Error())
+ 	}
+ 	cm, err := solaredge.NewCommonModel(infoData)
+ 	if err != nil {
+@@ -168,7 +168,7 @@ func runCollection(target string, meterMetrics []*exporter.MeterMetrics) {
+ 	for {
+ 		inverterData, err := client.ReadHoldingRegisters(40069, 40)
+ 		if err != nil {
+-			log.Error().Msgf("[%s] Error reading holding registers: %s", target, err.Error())
++			withReadErrorFields(log.Error(), target, "poll", err).Msgf("[%s] Error reading holding registers: %s", target, err.Error())
+ 			exporter.Modbus_Read_OK.WithLabelValues(target).Set(0)
+ 			log.Error().Msgf("[%s] Attempting to reconnect", target)
+ 			_ = handler.Close()
+@@ -192,7 +192,7 @@ func runCollection(target string, meterMetrics []*exporter.MeterMetrics) {
+ 		for i := range activeMeters {
+ 			meterData, err := client.ReadHoldingRegisters(uint16(meterDataBase+i*meterBlockLength), 105)
+ 			if err != nil {
+-				log.Error().Msgf("[%s] Error reading meter %d registers: %s", target, i+1, err.Error())
++				withReadErrorFields(log.Error(), target, "meter_read", err).Msgf("[%s] Error reading meter %d registers: %s", target, i+1, err.Error())
+ 				break
+ 			}
+ 			mt, err := solaredge.NewMeterModel(meterData)
+@@ -237,7 +237,7 @@ func detectMeters(client modbus.Client, target string, numMeters int) (int, bool
+ 				log.Info().Msgf("[%s] Meter %d not enabled (%s), skipping meter collection for it", target, i+1, err.Error())
+ 				break
+ 			}
+-			log.Warn().Msgf("[%s] Error reading meter %d common block: %s", target, i+1, err.Error())
++			withReadErrorFields(log.Warn(), target, "meter_read", err).Msgf("[%s] Error reading meter %d common block: %s", target, i+1, err.Error())
+ 			return activeMeters, false
+ 		}
+ 		cm, err := solaredge.NewCommonMeter(meterInfoData)
+diff --git a/modbuserr.go b/modbuserr.go
+new file mode 100644
+index 0000000..d659f70
+--- /dev/null
++++ b/modbuserr.go
+@@ -0,0 +1,69 @@
++package main
++
++import (
++	"errors"
++	"io"
++	"net"
++	"syscall"
++
++	"github.com/goburrow/modbus"
++	"github.com/rs/zerolog"
++)
++
++// Values of the error_class field on a failed Modbus call.
++const (
++	errClassModbusException   = "modbus_exception"
++	errClassTimeout           = "timeout"
++	errClassConnectionReset   = "connection_reset"
++	errClassConnectionClosed  = "connection_closed"
++	errClassConnectionRefused = "connection_refused"
++	errClassOther             = "other"
++)
++
++// classifyReadError names the kind of failure. A Modbus exception is an answer
++// from the inverter. The other classes are transport failures: a reset, a
++// refused dial, an early close, or no answer before the timeout.
++func classifyReadError(err error) string {
++	var mbErr *modbus.ModbusError
++	if errors.As(err, &mbErr) {
++		return errClassModbusException
++	}
++	if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
++		return errClassConnectionClosed
++	}
++	if errors.Is(err, syscall.ECONNRESET) {
++		return errClassConnectionReset
++	}
++	if errors.Is(err, syscall.ECONNREFUSED) {
++		return errClassConnectionRefused
++	}
++	var netErr net.Error
++	if errors.As(err, &netErr) && netErr.Timeout() {
++		return errClassTimeout
++	}
++	return errClassOther
++}
++
++// withReadErrorFields adds the failure fields to an event. The caller keeps its
++// existing message text. For a Modbus exception it also adds the function and
++// exception codes, so a query can filter on the code the inverter returned.
++func withReadErrorFields(ev *zerolog.Event, target, phase string, err error) *zerolog.Event {
++	ev = ev.
++		Str("target", target).
++		Str("phase", phase).
++		Str("error_class", classifyReadError(err))
++	var mbErr *modbus.ModbusError
++	if errors.As(err, &mbErr) {
++		ev = ev.
++			Uint8("modbus_function_code", requestFunctionCode(mbErr)).
++			Uint8("modbus_exception_code", mbErr.ExceptionCode)
++	}
++	return ev
++}
++
++// requestFunctionCode returns the function code of the request. goburrow keeps
++// the exception bit (0x80) in FunctionCode of the reply, so 0x83 is a failed
++// read holding registers (0x03).
++func requestFunctionCode(mbErr *modbus.ModbusError) uint8 {
++	return mbErr.FunctionCode &^ 0x80
++}
+diff --git a/modbuserr_test.go b/modbuserr_test.go
+new file mode 100644
+index 0000000..818de47
+--- /dev/null
++++ b/modbuserr_test.go
+@@ -0,0 +1,177 @@
++package main
++
++import (
++	"errors"
++	"fmt"
++	"io"
++	"net"
++	"os"
++	"syscall"
++	"testing"
++	"time"
++
++	"github.com/goburrow/modbus"
++)
++
++func TestClassifyReadError(t *testing.T) {
++	tests := []struct {
++		name string
++		err  error
++		want string
++	}{
++		{"modbus exception", &modbus.ModbusError{FunctionCode: 0x03, ExceptionCode: 0x02}, errClassModbusException},
++		{"wrapped modbus exception", fmt.Errorf("read: %w", &modbus.ModbusError{FunctionCode: 0x03, ExceptionCode: 0x02}), errClassModbusException},
++		{"eof", io.EOF, errClassConnectionClosed},
++		{"unexpected eof", io.ErrUnexpectedEOF, errClassConnectionClosed},
++		{"reset", &net.OpError{Op: "read", Err: &os.SyscallError{Syscall: "read", Err: syscall.ECONNRESET}}, errClassConnectionReset},
++		{"refused", &net.OpError{Op: "dial", Err: &os.SyscallError{Syscall: "connect", Err: syscall.ECONNREFUSED}}, errClassConnectionRefused},
++		{"timeout", &net.OpError{Op: "read", Err: os.ErrDeadlineExceeded}, errClassTimeout},
++		{"other", errors.New("boom"), errClassOther},
++	}
++	for _, tt := range tests {
++		t.Run(tt.name, func(t *testing.T) {
++			if got := classifyReadError(tt.err); got != tt.want {
++				t.Fatalf("classifyReadError() = %q, want %q", got, tt.want)
++			}
++		})
++	}
++}
++
++// fakeInverter starts a TCP listener on loopback. Each accepted connection is
++// handed to handle, which decides how the fake inverter answers.
++func fakeInverter(t *testing.T, handle func(conn net.Conn)) string {
++	t.Helper()
++	ln, err := net.Listen("tcp", "127.0.0.1:0")
++	if err != nil {
++		t.Fatal(err)
++	}
++	t.Cleanup(func() { _ = ln.Close() })
++	go func() {
++		for {
++			conn, err := ln.Accept()
++			if err != nil {
++				return
++			}
++			go handle(conn)
++		}
++	}()
++	return ln.Addr().String()
++}
++
++// readRequest consumes one Modbus TCP request: a 7 byte MBAP header and a 5
++// byte read-holding-registers PDU. It returns the request so the reply can
++// echo the transaction id and unit id.
++func readRequest(conn net.Conn) ([]byte, error) {
++	buf := make([]byte, 12)
++	_, err := io.ReadFull(conn, buf)
++	return buf, err
++}
++
++// pollOnce runs the same call the exporter makes, with a short timeout.
++func pollOnce(addr string, timeout time.Duration) error {
++	handler := modbus.NewTCPClientHandler(addr)
++	handler.Timeout = timeout
++	handler.SlaveId = 1
++	defer handler.Close()
++	if err := handler.Connect(); err != nil {
++		return err
++	}
++	_, err := modbus.NewClient(handler).ReadHoldingRegisters(40069, 40)
++	return err
++}
++
++func TestPollErrorsFromFakeInverter(t *testing.T) {
++	const timeout = 300 * time.Millisecond
++
++	t.Run("modbus exception", func(t *testing.T) {
++		addr := fakeInverter(t, func(conn net.Conn) {
++			defer conn.Close()
++			req, err := readRequest(conn)
++			if err != nil {
++				return
++			}
++			// Exception response: function 0x03 | 0x80, exception code 0x02.
++			reply := []byte{req[0], req[1], 0, 0, 0, 3, req[6], 0x83, 0x02}
++			_, _ = conn.Write(reply)
++			_, _ = io.Copy(io.Discard, conn)
++		})
++		err := pollOnce(addr, timeout)
++		var mbErr *modbus.ModbusError
++		if !errors.As(err, &mbErr) {
++			t.Fatalf("want *modbus.ModbusError, got %T: %v", err, err)
++		}
++		if mbErr.ExceptionCode != 0x02 {
++			t.Fatalf("exception code = %#x, want 0x02", mbErr.ExceptionCode)
++		}
++		// goburrow keeps the exception bit in the reply's FunctionCode.
++		if mbErr.FunctionCode != 0x83 {
++			t.Fatalf("reply function code = %#x, want 0x83", mbErr.FunctionCode)
++		}
++		if got := requestFunctionCode(mbErr); got != 0x03 {
++			t.Fatalf("request function code = %#x, want 0x03", got)
++		}
++		if got := classifyReadError(err); got != errClassModbusException {
++			t.Fatalf("class = %q, want %q", got, errClassModbusException)
++		}
++	})
++
++	t.Run("timeout", func(t *testing.T) {
++		addr := fakeInverter(t, func(conn net.Conn) {
++			defer conn.Close()
++			if _, err := readRequest(conn); err != nil {
++				return
++			}
++			// Never answer. The client gives up after its timeout.
++			_, _ = io.Copy(io.Discard, conn)
++		})
++		err := pollOnce(addr, timeout)
++		if got := classifyReadError(err); got != errClassTimeout {
++			t.Fatalf("class = %q, want %q (err: %v)", got, errClassTimeout, err)
++		}
++	})
++
++	t.Run("connection reset", func(t *testing.T) {
++		addr := fakeInverter(t, func(conn net.Conn) {
++			req, err := readRequest(conn)
++			if err != nil {
++				_ = conn.Close()
++				return
++			}
++			_ = req
++			// SO_LINGER 0 makes Close send a RST instead of a FIN.
++			if tc, ok := conn.(*net.TCPConn); ok {
++				_ = tc.SetLinger(0)
++			}
++			_ = conn.Close()
++		})
++		err := pollOnce(addr, timeout)
++		if got := classifyReadError(err); got != errClassConnectionReset {
++			t.Fatalf("class = %q, want %q (err: %v)", got, errClassConnectionReset, err)
++		}
++	})
++
++	t.Run("connection closed", func(t *testing.T) {
++		addr := fakeInverter(t, func(conn net.Conn) {
++			_, _ = readRequest(conn)
++			_ = conn.Close()
++		})
++		err := pollOnce(addr, timeout)
++		if got := classifyReadError(err); got != errClassConnectionClosed {
++			t.Fatalf("class = %q, want %q (err: %v)", got, errClassConnectionClosed, err)
++		}
++	})
++
++	t.Run("connection refused", func(t *testing.T) {
++		// Bind, read the port, and close. Nothing listens on it when we dial.
++		ln, err := net.Listen("tcp", "127.0.0.1:0")
++		if err != nil {
++			t.Fatal(err)
++		}
++		addr := ln.Addr().String()
++		_ = ln.Close()
++		err = pollOnce(addr, timeout)
++		if got := classifyReadError(err); got != errClassConnectionRefused {
++			t.Fatalf("class = %q, want %q (err: %v)", got, errClassConnectionRefused, err)
++		}
++	})
++}

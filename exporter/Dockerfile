@@ -11,10 +11,12 @@ RUN apk add --no-cache git
 WORKDIR /src
 COPY inverter-info.patch /tmp/inverter-info.patch
 COPY modbus-read-ok.patch /tmp/modbus-read-ok.patch
+COPY modbus-read-errors.patch /tmp/modbus-read-errors.patch
 RUN git clone https://github.com/dave92082/SolarEdge-Exporter.git . \
     && git checkout "${EXPORTER_GIT_SHA}" \
     && git apply /tmp/inverter-info.patch \
-    && git apply /tmp/modbus-read-ok.patch
+    && git apply /tmp/modbus-read-ok.patch \
+    && git apply /tmp/modbus-read-errors.patch
 RUN CGO_ENABLED=0 go build -o solaredge-exporter .
 
 FROM alpine:3.22
