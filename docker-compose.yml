@@ -1,0 +1,90 @@
+services:
+  sunspec-sim:
+    profiles: ["sim"]
+    build:
+      context: ./sunspec-sim
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import socket; s=socket.create_connection(('127.0.0.1',502),2); s.close()\""]
+      interval: 2s
+      timeout: 2s
+      retries: 15
+      start_period: 2s
+
+  solaredge-exporter:
+    build:
+      context: ./exporter
+      args:
+        EXPORTER_GIT_SHA: 42d4790b78f76a5fae9e931cf78a76dbda0ccb53
+    restart: unless-stopped
+    depends_on:
+      sunspec-sim:
+        condition: service_healthy
+        required: false
+    environment:
+      INVERTER_ADDRESS: ${INVERTER_ADDRESS:?set INVERTER_ADDRESS}
+      INVERTER_PORT: ${INVERTER_PORT:-502}
+      NUMBER_METERS: ${NUMBER_METERS:-0}
+      INVERTER_CLIENT_ID: ${INVERTER_CLIENT_ID:-1}
+      EXPORTER_INTERVAL: ${EXPORTER_INTERVAL:-5}
+      EXPORTER_ADDRESS: "0.0.0.0"
+      EXPORTER_PORT: "2112"
+      LOG_PATH: /var/log/solaredge/solaredge-exporter.log
+    volumes:
+      - exporter-logs:/var/log/solaredge
+
+  solaredge-geolocate:
+    build:
+      context: ./geolocate
+    restart: unless-stopped
+    environment:
+      SITE_LAT: ${SITE_LAT:-}
+      SITE_LON: ${SITE_LON:-}
+      PV_TILT: ${PV_TILT:-25}
+      PV_AZIMUTH: ${PV_AZIMUTH:-0}
+      PV_KWP: ${PV_KWP:-4.56}
+      PV_PR: ${PV_PR:-0.8}
+      PV_AC_LIMIT_W: ${PV_AC_LIMIT_W:-3800}
+    volumes:
+      - geolocate-data:/var/lib/geolocate
+
+  alloy:
+    image: grafana/alloy:${GRAFANA_ALLOY_VERSION:-v1.21.2}
+    restart: unless-stopped
+    depends_on:
+      - solaredge-exporter
+      - solaredge-geolocate
+    ports:
+      - 127.0.0.1:12345:12345
+    environment:
+      GRAFANA_CLOUD_PROM_URL: ${GRAFANA_CLOUD_PROM_URL:?set GRAFANA_CLOUD_PROM_URL}
+      GRAFANA_CLOUD_PROM_USERNAME: ${GRAFANA_CLOUD_PROM_USERNAME:?set GRAFANA_CLOUD_PROM_USERNAME}
+      GRAFANA_CLOUD_PROM_PASSWORD: ${GRAFANA_CLOUD_PROM_PASSWORD:?set GRAFANA_CLOUD_PROM_PASSWORD}
+      GRAFANA_CLOUD_LOKI_URL: ${GRAFANA_CLOUD_LOKI_URL:?set GRAFANA_CLOUD_LOKI_URL}
+      GRAFANA_CLOUD_LOKI_USERNAME: ${GRAFANA_CLOUD_LOKI_USERNAME:?set GRAFANA_CLOUD_LOKI_USERNAME}
+      GRAFANA_CLOUD_LOKI_PASSWORD: ${GRAFANA_CLOUD_LOKI_PASSWORD:?set GRAFANA_CLOUD_LOKI_PASSWORD}
+    volumes:
+      - ./config.alloy:/etc/alloy/config.alloy:ro
+      - ./module/metrics.alloy:/etc/alloy/module/metrics.alloy:ro
+      - exporter-logs:/var/log/solaredge:ro
+      - alloy-data:/var/lib/alloy/data
+    command:
+      - run
+      - --server.http.listen-addr=0.0.0.0:12345
+      - --storage.path=/var/lib/alloy/data
+      - /etc/alloy/config.alloy
+
+  synthetic-monitoring-agent:
+    image: grafana/synthetic-monitoring-agent:v0.68.0
+    restart: unless-stopped
+    depends_on:
+      - solaredge-exporter
+    environment:
+      SM_AGENT_API_TOKEN: ${SM_API_TOKEN:?set SM_API_TOKEN}
+    command:
+      - --api-server-address=${SM_API_SERVER:?set SM_API_SERVER}:443
+      - --blocked-nets=0.0.0.0/32
+
+volumes:
+  alloy-data:
+  exporter-logs:
+  geolocate-data:

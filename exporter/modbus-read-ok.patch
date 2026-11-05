@@ -1,0 +1,40 @@
+diff --git a/main.go b/main.go
+--- a/main.go
++++ b/main.go
+@@ -135,6 +135,7 @@
+ 	err := handler.Connect()
+ 	if err != nil {
+ 		log.Error().Msgf("[%s] Error connecting to Inverter: %s", target, err.Error())
++		exporter.Modbus_Read_OK.WithLabelValues(target).Set(0)
+ 	}
+ 	client := modbus.NewClient(handler)
+ 	defer handler.Close()
+@@ -165,6 +166,7 @@
+ 
+ 	// Collect logs forever
+ 	for {
++		exporter.Modbus_Read_OK.WithLabelValues(target).Set(0)
+ 		inverterData, err := client.ReadHoldingRegisters(40069, 40)
+ 		if err != nil {
+ 			log.Error().Msgf("[%s] Error reading holding registers: %s", target, err.Error())
+@@ -180,6 +182,7 @@
+ 			continue
+ 		}
+ 		setMetrics(id, target)
++		exporter.Modbus_Read_OK.WithLabelValues(target).Set(1)
+ 
+ 		if !metersDetected {
+ 			activeMeters, metersDetected = detectMeters(client, target, len(meterMetrics))
+diff --git a/exporter/metrics.go b/exporter/metrics.go
+--- a/exporter/metrics.go
++++ b/exporter/metrics.go
+@@ -153,6 +153,9 @@
+ 		Name: "Inverter_Info",
+ 		Help: "1 for the SunSpec common-block identity of an inverter",
+ 	}, []string{"inverter", "manufacturer", "model", "serial", "version"})
++
++	Modbus_Read_OK = newGauge("Modbus_Read_OK",
++		"1 after this poll published the inverter model block. A later meter error does not clear it.")
+ )
+ 
+ // MeterMetrics holds the full set of gauges for a single meter. Meter 1 uses

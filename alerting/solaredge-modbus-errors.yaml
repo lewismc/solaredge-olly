@@ -1,0 +1,46 @@
+# Grafana-managed rule. No contact point is committed; attach your own receiver.
+# Set grafana.app/folder (label and annotation) to your folder UID before pushing.
+apiVersion: rules.alerting.grafana.app/v0alpha1
+kind: AlertRule
+metadata:
+  name: solaredge-modbus-errors
+  labels:
+    grafana.app/folder: YOUR_FOLDER_UID
+  annotations:
+    grafana.app/folder: YOUR_FOLDER_UID
+spec:
+  title: SolarEdge Modbus errors
+  for: 5m0s
+  noDataState: Ok
+  execErrState: Error
+  trigger:
+    interval: 1m0s
+  annotations:
+    summary: SolarEdge exporter is logging Modbus errors.
+  expressions:
+    A:
+      datasourceUID: grafanacloud-logs
+      queryType: instant
+      relativeTimeRange:
+        from: 5m0s
+        to: 0s
+      model:
+        expr: sum(count_over_time({service_name="solaredge-exporter", job="integrations/solaredge"} | json | level="error" [5m]))
+        queryType: instant
+        intervalMs: 1000
+        maxDataPoints: 43200
+        refId: A
+    B:
+      source: true
+      model:
+        type: threshold
+        expression: A
+        refId: B
+        intervalMs: 1000
+        maxDataPoints: 43200
+        conditions:
+          - evaluator:
+              type: gt
+              params:
+                - 0
+            type: gt

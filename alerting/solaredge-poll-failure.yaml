@@ -1,0 +1,50 @@
+# Grafana-managed rule. No contact point is committed; attach your own receiver.
+# Set grafana.app/folder (label and annotation) to your folder UID before pushing.
+# This is the Modbus poll, not the Prometheus scrape. up == 0 remains the :2112 scrape.
+# The query keeps the gauge. Threshold < 1 is Modbus_Read_OK == 0.
+# A filtered `== 0` query is empty while the poll is succeeding.
+apiVersion: rules.alerting.grafana.app/v0alpha1
+kind: AlertRule
+metadata:
+  name: solaredge-poll-failure
+  labels:
+    grafana.app/folder: YOUR_FOLDER_UID
+  annotations:
+    grafana.app/folder: YOUR_FOLDER_UID
+spec:
+  title: SolarEdge poll failure
+  for: 5m0s
+  noDataState: NoData
+  execErrState: Error
+  trigger:
+    interval: 1m0s
+  annotations:
+    summary: SolarEdge Modbus poll failed (Modbus_Read_OK == 0). A missing series is NoData; up == 0 covers a down scrape.
+  expressions:
+    A:
+      datasourceUID: grafanacloud-prom
+      queryType: instant
+      relativeTimeRange:
+        from: 5m0s
+        to: 0s
+      model:
+        expr: Modbus_Read_OK{job="integrations/solaredge"}
+        instant: true
+        intervalMs: 1000
+        maxDataPoints: 43200
+        queryType: instant
+        refId: A
+    B:
+      source: true
+      model:
+        type: threshold
+        expression: A
+        refId: B
+        intervalMs: 1000
+        maxDataPoints: 43200
+        conditions:
+          - evaluator:
+              type: lt
+              params:
+                - 1
+            type: lt
