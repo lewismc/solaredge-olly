@@ -63,7 +63,7 @@ services:
       GRAFANA_CLOUD_LOKI_USERNAME: ${GRAFANA_CLOUD_LOKI_USERNAME:?set GRAFANA_CLOUD_LOKI_USERNAME}
       GRAFANA_CLOUD_LOKI_PASSWORD: ${GRAFANA_CLOUD_LOKI_PASSWORD:?set GRAFANA_CLOUD_LOKI_PASSWORD}
     volumes:
-      - ./config.alloy:/etc/alloy/config.alloy:ro
+      - ./alloy/config.alloy:/etc/alloy/config.alloy:ro
       - ./module/metrics.alloy:/etc/alloy/module/metrics.alloy:ro
       - exporter-logs:/var/log/solaredge:ro
       - alloy-data:/var/lib/alloy/data
