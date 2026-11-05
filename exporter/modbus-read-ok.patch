@@ -13,7 +13,7 @@ index 1087b1d..ba3c4c2 100644
  
  // MeterMetrics holds the full set of gauges for a single meter. Meter 1 uses
 diff --git a/main.go b/main.go
-index 4b87051..9697b32 100644
+index 4b87051..6b9e0f7 100644
 --- a/main.go
 +++ b/main.go
 @@ -135,6 +135,7 @@ func runCollection(target string, meterMetrics []*exporter.MeterMetrics) {
@@ -24,7 +24,20 @@ index 4b87051..9697b32 100644
  	}
  	client := modbus.NewClient(handler)
  	defer handler.Close()
-@@ -168,6 +169,7 @@ func runCollection(target string, meterMetrics []*exporter.MeterMetrics) {
+@@ -143,10 +144,12 @@ func runCollection(target string, meterMetrics []*exporter.MeterMetrics) {
+ 	infoData, err := client.ReadHoldingRegisters(40000, 70)
+ 	if err != nil {
+ 		log.Error().Msgf("[%s] Error reading inverter common block: %s", target, err.Error())
++		exporter.Modbus_Read_OK.WithLabelValues(target).Set(0)
+ 	}
+ 	cm, err := solaredge.NewCommonModel(infoData)
+ 	if err != nil {
+ 		log.Error().Msgf("[%s] Error parsing inverter common block: %s", target, err.Error())
++		exporter.Modbus_Read_OK.WithLabelValues(target).Set(0)
+ 	} else {
+ 		exporter.Inverter_Info.WithLabelValues(
+ 			target,
+@@ -168,6 +171,7 @@ func runCollection(target string, meterMetrics []*exporter.MeterMetrics) {
  		inverterData, err := client.ReadHoldingRegisters(40069, 40)
  		if err != nil {
  			log.Error().Msgf("[%s] Error reading holding registers: %s", target, err.Error())
@@ -32,7 +45,7 @@ index 4b87051..9697b32 100644
  			log.Error().Msgf("[%s] Attempting to reconnect", target)
  			_ = handler.Close()
  			time.Sleep(7 * time.Second)
-@@ -177,9 +179,11 @@ func runCollection(target string, meterMetrics []*exporter.MeterMetrics) {
+@@ -177,9 +181,11 @@ func runCollection(target string, meterMetrics []*exporter.MeterMetrics) {
  		id, err := solaredge.NewInverterModel(inverterData)
  		if err != nil {
  			log.Error().Msgf("[%s] Error parsing data: %s", target, err.Error())
