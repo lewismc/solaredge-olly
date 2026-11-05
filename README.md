@@ -80,6 +80,8 @@ The first build clones the exporter commit and compiles it. Later starts reuse t
 
 Exporter logs are JSON lines, at info level. A healthy process logs startup once, then only Modbus errors and reconnects. The stream labels are `service_name` and `job`. `job` is `integrations/solaredge`, the same value as the scrape. The inverter address is in the line body, not a label, because a DHCP lease can move it. Debug logging stays off: it writes a line every 5 seconds. Alloy remembers the byte offset in the file, so a restart does not send those lines again.
 
+A failed Modbus read is logged with the same message text as before, plus body fields. Read failures are at error level, except meter detection, which stays at warn. `phase` is `connect`, `common_block`, `poll`, or `meter_read`. `error_class` is `modbus_exception`, `timeout`, `connection_reset`, `connection_closed`, `connection_refused`, or `other`. A `modbus_exception` line also carries `modbus_function_code` and `modbus_exception_code`, the code the inverter returned. These are body fields, not labels, so query them with `| json`.
+
 Each series has an `inverter` label of `host:port`, for example `AC_Power{inverter="192.168.1.189:502"}`.
 
 Register values are unscaled. The dashboard turns them into engineering units with the matching scale factor, and scopes each series with `job="integrations/solaredge"` and the `inverter` variable:
@@ -177,7 +179,7 @@ gcx synthetic-monitoring checks create -f synthetic/exporter-http.yaml
 
 [`slo/`](slo/) holds two Grafana Cloud SLOs, objective 0.99 over 28 days. `metadata.name` is empty so the file does not pin one stack's UUID. Both set `spec.labels` to `service_name=solaredge`. The SLO app reads that key for the service column and the insights "Missing service label" count. A label named `service` does not count. Fast-burn and slow-burn alerts each carry an `assistantInvestigation` enrichment, so a firing burn alert starts an Assistant investigation. `gcx resources push` treats that empty name as a single object, so push one file at a time. No contact point is committed. There is no energy SLO.
 
-`Modbus_Read_OK` is the poll gauge from [`exporter/modbus-read-ok.patch`](exporter/modbus-read-ok.patch). It is 0 at the start of each poll and when the first connection fails, and 1 only after that poll publishes the inverter model. A meter error later in the poll does not clear it. `Inverter_Info` stays the once-at-startup series. The keep-list in [`module/metrics.alloy`](module/metrics.alloy) includes the gauge.
+`Modbus_Read_OK` is the poll gauge from [`exporter/modbus-read-ok.patch`](exporter/modbus-read-ok.patch). It is 1 after a poll publishes the inverter model, and it stays 1 between polls. It goes to 0 only when a connect, a read, or a parse fails, and the next successful poll sets it back to 1. A meter error later in the poll does not clear it. An earlier revision reset the gauge to 0 at the start of every poll, so a scrape that landed during a good read recorded a failure. The poll-success SLO history therefore starts over at this change, and its earlier values are not comparable. `Inverter_Info` stays the once-at-startup series. The keep-list in [`module/metrics.alloy`](module/metrics.alloy) includes the gauge.
 
 Poll success is a threshold query: `Modbus_Read_OK{job="integrations/solaredge"}` at or above 1, grouped by `inverter`. A ratio query would wrap the gauge in `rate()`, which stays near 0.
 
@@ -215,6 +217,8 @@ Each chapter gets its own directory when it is implemented.
 **No exporter logs in Grafana Cloud.** Confirm `loki.source.file.exporter` is tailing `/var/log/solaredge/solaredge-exporter.log` and `loki.write.cloud` is healthy. The access policy needs `logs:write`. `GRAFANA_CLOUD_LOKI_USERNAME` is the Loki instance id, not the Prometheus one, and the URL must end in `/loki/api/v1/push`.
 
 **Another Modbus client is already connected.** The inverter accepts one client. Disconnect the other client and restart `solaredge-exporter`.
+
+**A Modbus read failed and you need the cause.** Filter the exporter logs by failure kind: `{service_name="solaredge-exporter", job="integrations/solaredge"} | json | error_class=~".+"`. A `modbus_exception` means the inverter answered, and `modbus_exception_code` gives the reason (for example `2` is an illegal data address, `4` a device failure, `6` a busy device). `timeout` and `connection_reset` point at the network path or a busy inverter. `connection_refused` means nothing listens on the port.
 
 **The site location is wrong.** A VPN, a corporate proxy, or iCloud Private Relay makes ipinfo see another address. Set `SITE_LAT` and `SITE_LON` in `.env`, then run `docker compose up -d solaredge-geolocate`. `Site_Location_Info` should show `location_source="Set coordinates"`.
 
