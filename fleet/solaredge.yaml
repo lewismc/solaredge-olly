@@ -1,0 +1,4 @@
+name: solaredge
+enabled: true
+matchers:
+  - integration=solaredge

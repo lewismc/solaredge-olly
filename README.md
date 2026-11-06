@@ -142,7 +142,15 @@ gcx resources push alertrules -p alerting
 
 ## Fleet Management
 
-[`alloy/config.alloy`](alloy/config.alloy) is how this example runs. [`fleet/solaredge.alloy`](fleet/solaredge.alloy) is that same pipeline for a reader who turns Fleet Management on. This repository does not publish a catalog entry, and Compose does not load the fleet file.
+[`alloy/config.alloy`](alloy/config.alloy) is how this example runs. Compose still loads it from disk. [`fleet/solaredge.alloy`](fleet/solaredge.alloy) is the same pipeline, published to the `lewism` stack's Fleet Management by [`.github/workflows/fleet-management-sync.yml`](.github/workflows/fleet-management-sync.yml), using [`grafana/fleet-management-sync-action@v0.3.0`](https://github.com/grafana/fleet-management-sync-action). The pipeline is [`fleet/solaredge.yaml`](fleet/solaredge.yaml) with matcher `integration=solaredge`, in namespace `solaredge-olly`.
+
+The workflow runs a format check, a validation against [`module/metrics.alloy`](module/metrics.alloy), and a diff requiring `alloy/config.alloy` and `fleet/solaredge.alloy` to match. Pull requests into `main` run the action as a dry run. Pushes to `main` and manual runs sync for real. It needs these repository secrets:
+
+- `FM_URL` is the Fleet Management base URL from Connections, Fleet Management, API.
+- `FM_USERNAME` is the Fleet Management instance id from the same tab.
+- `FM_TOKEN` is an access-policy token with `fleet-management:write`.
+
+Until a real sync has succeeded and the bootstrap change has been made, the collector keeps loading [`alloy/config.alloy`](alloy/config.alloy) from disk.
 
 The collector's local config is only the bootstrap. The module stays mounted at `/etc/alloy/module/metrics.alloy`, which the remote pipeline imports. Secrets stay in the environment.
 
