@@ -142,36 +142,37 @@ gcx resources push alertrules -p alerting
 
 ## Fleet Management
 
-[`alloy/config.alloy`](alloy/config.alloy) is how this example runs. Compose still loads it from disk. [`fleet/solaredge.alloy`](fleet/solaredge.alloy) is the same pipeline, published to the `lewism` stack's Fleet Management by [`.github/workflows/fleet-management-sync.yml`](.github/workflows/fleet-management-sync.yml), using [`grafana/fleet-management-sync-action@v0.3.0`](https://github.com/grafana/fleet-management-sync-action). The pipeline is [`fleet/solaredge.yaml`](fleet/solaredge.yaml) with matcher `integration=solaredge`, in namespace `solaredge-olly`.
+[`alloy/config.alloy`](alloy/config.alloy) is now only the bootstrap. It registers the collector with Fleet Management and is the only local Alloy config Compose loads. [`fleet/solaredge.alloy`](fleet/solaredge.alloy) is the pipeline, published to the `lewism` stack's Fleet Management by [`.github/workflows/fleet-management-sync.yml`](.github/workflows/fleet-management-sync.yml), using [`grafana/fleet-management-sync-action@v0.3.0`](https://github.com/grafana/fleet-management-sync-action). The pipeline is [`fleet/solaredge.yaml`](fleet/solaredge.yaml) with matcher `integration=solaredge`, in namespace `solaredge-olly`.
 
-The workflow runs a format check, a validation against [`module/metrics.alloy`](module/metrics.alloy), and a diff requiring `alloy/config.alloy` and `fleet/solaredge.alloy` to match. Pull requests into `main` run the action as a dry run. Pushes to `main` and manual runs sync for real. It needs these repository secrets:
+The workflow runs a format check and a validation against [`module/metrics.alloy`](module/metrics.alloy). Pull requests into `main` run the action as a dry run. Pushes to `main` and manual runs sync for real. It needs these repository secrets:
 
 - `FM_URL` is the Fleet Management base URL from Connections, Fleet Management, API.
 - `FM_USERNAME` is the numeric Fleet Management instance id from the same tab. The stack slug is rejected.
 - `FM_TOKEN` is the access-policy token alone, with `fleet-management:write`. No `username:token` prefix and no trailing newline.
 
-Until a real sync has succeeded and the bootstrap change has been made, the collector keeps loading [`alloy/config.alloy`](alloy/config.alloy) from disk.
+Compose passes `FLEET_MANAGEMENT_URL` and `FLEET_MANAGEMENT_USERNAME` from `.env`, and `GCLOUD_RW_API_KEY` from the metrics token. The collector id is the fixed string `solaredge`, so a container recreate does not register a new collector.
 
 The collector's local config is only the bootstrap. The module stays mounted at `/etc/alloy/module/metrics.alloy`, which the remote pipeline imports. Secrets stay in the environment.
 
 ```alloy
 remotecfg {
-  url = "https://FLEET_MANAGEMENT_HOST"
+  url = sys.env("FLEET_MANAGEMENT_URL")
 
   basic_auth {
-    username = sys.env("GRAFANA_CLOUD_STACK_ID")
-    password = sys.env("GRAFANA_CLOUD_API_KEY")
+    username = sys.env("FLEET_MANAGEMENT_USERNAME")
+    password = sys.env("GCLOUD_RW_API_KEY")
   }
 
+  id             = "solaredge"
   poll_frequency = "1m"
 
   attributes = {
-    env = sys.env("ENVIRONMENT"),
+    integration = "solaredge",
   }
 }
 ```
 
-`FLEET_MANAGEMENT_HOST` is the host on the stack's Fleet Management page. The remote pipeline is the contents of `fleet/solaredge.alloy`. Match it to collectors with the attributes you set here. Readers without Fleet Management leave Compose on `alloy/config.alloy`.
+The remote pipeline is the contents of `fleet/solaredge.alloy`. It matches this collector through the `integration=solaredge` attribute. A collector that does not run this bootstrap receives no scrape configuration.
 
 ## Synthetic monitoring
 
