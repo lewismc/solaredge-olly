@@ -108,7 +108,7 @@ Stop the stack with `docker compose --profile sim down` when the simulator was s
 
 ## Module
 
-Scrape settings, the keep-list, and the `forward_to` receiver live in [`module/metrics.alloy`](module/metrics.alloy). The default keep-list is `up`, `SunSpec_*`, `AC_*`, `DC_*`, `Temp_*`, `Status*`, `Inverter_Info`, `M_*`, `M2_*`, and `M3_*`. Exporter `go_*` series are dropped. See [`module/README.md`](module/README.md). Exporter log shipping lives in [`alloy/config.alloy`](alloy/config.alloy), not in that module.
+Scrape settings, the keep-list, and the `forward_to` receiver live in [`module/metrics.alloy`](module/metrics.alloy). The default keep-list is `up`, `SunSpec_*`, `AC_*`, `DC_*`, `Temp_*`, `Status*`, `Inverter_Info`, `M_*`, `M2_*`, and `M3_*`. Exporter `go_*` series are dropped. See [`module/README.md`](module/README.md). Exporter log shipping lives in [`fleet/solaredge.alloy`](fleet/solaredge.alloy), not in that module.
 
 ## Dashboard
 
@@ -172,7 +172,7 @@ remotecfg {
 }
 ```
 
-The remote pipeline is the contents of `fleet/solaredge.alloy`. It matches this collector through the `integration=solaredge` attribute. A collector that does not run this bootstrap receives no scrape configuration.
+The remote pipeline is the contents of `fleet/solaredge.alloy`. Fleet Management loads it inside `declare "solaredge"`, so the module import is named `solaredge_module` and the file has no `livedebugging` block. A service block is not allowed inside a module. The pipeline matches this collector through the `integration=solaredge` attribute. A collector that does not run this bootstrap receives no scrape configuration.
 
 ## Synthetic monitoring
 
@@ -210,7 +210,7 @@ done
 Each chapter gets its own directory when it is implemented.
 
 1. **Alerts** in [`alerting/`](alerting/). Implemented.
-2. **Fleet Management** in [`fleet/solaredge.alloy`](fleet/solaredge.alloy), optional. Implemented. [`alloy/config.alloy`](alloy/config.alloy) stays the way this example runs.
+2. **Fleet Management** in [`fleet/solaredge.alloy`](fleet/solaredge.alloy). Implemented. [`alloy/config.alloy`](alloy/config.alloy) is the `remotecfg` bootstrap.
 3. **Synthetic monitoring** in [`synthetic/`](synthetic/). Implemented. The private probe starts with `docker compose up`. The k6 check does not prove the inverter answered the latest poll.
 4. **SLOs** in [`slo/`](slo/). Implemented. Poll success, and fault-free among successful polls. No energy SLO.
 5. **Geolocation and expected yield** in [`geolocate/`](geolocate/). Implemented. No alert or SLO on expected yield yet.

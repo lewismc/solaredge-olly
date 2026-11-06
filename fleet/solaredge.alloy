@@ -79,5 +79,3 @@ loki.write "cloud" {
 		}
 	}
 }
-
-livedebugging { }
