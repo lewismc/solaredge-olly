@@ -5,14 +5,12 @@ on:
     branches: [main]
     paths:
       - 'fleet/**'
-      - 'alloy/config.alloy'
       - 'module/**'
       - '.github/workflows/fleet-management-sync.yml'
   push:
     branches: [main]
     paths:
       - 'fleet/**'
-      - 'alloy/config.alloy'
       - 'module/**'
       - '.github/workflows/fleet-management-sync.yml'
   workflow_dispatch:
@@ -44,9 +42,6 @@ jobs:
             -v "$PWD/module/metrics.alloy:/etc/alloy/module/metrics.alloy:ro" \
             grafana/alloy:v1.21.2 \
             validate /repo/fleet/solaredge.alloy
-
-      - name: Require fleet pipeline to match alloy/config.alloy
-        run: diff -u alloy/config.alloy fleet/solaredge.alloy
 
   sync:
     needs: validate

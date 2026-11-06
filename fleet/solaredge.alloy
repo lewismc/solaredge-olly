@@ -3,7 +3,7 @@
 // Loads the module shipped in this repository. Grafana Cloud credentials come from
 // the process environment and are never written into this file.
 
-import.file "solaredge" {
+import.file "solaredge_module" {
 	filename = "/etc/alloy/module/metrics.alloy"
 }
 
@@ -18,23 +18,23 @@ prometheus.remote_write "cloud" {
 	}
 }
 
-solaredge.local "exporter" {
+solaredge_module.local "exporter" {
 	exporter_address = "solaredge-exporter:2112"
 }
 
-solaredge.scrape "inverter" {
-	targets    = solaredge.local.exporter.output
+solaredge_module.scrape "inverter" {
+	targets    = solaredge_module.local.exporter.output
 	forward_to = [prometheus.remote_write.cloud.receiver]
 }
 
 // Site location and expected yield from solaredge-geolocate. A separate job, so
 // the inverter alerts and SLOs on integrations/solaredge do not change.
-solaredge.local "geolocate" {
+solaredge_module.local "geolocate" {
 	exporter_address = "solaredge-geolocate:9110"
 }
 
-solaredge.scrape "geolocate" {
-	targets      = solaredge.local.geolocate.output
+solaredge_module.scrape "geolocate" {
+	targets      = solaredge_module.local.geolocate.output
 	job_label    = "integrations/solaredge-geolocate"
 	keep_metrics = "(up|Site_.+)"
 	forward_to   = [prometheus.remote_write.cloud.receiver]
