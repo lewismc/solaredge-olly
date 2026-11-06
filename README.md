@@ -76,7 +76,7 @@ The first build clones the exporter commit and compiles it. Later starts reuse t
 
 - Alloy UI: http://127.0.0.1:12345
 - In Grafana Cloud Metrics, query `up{job="integrations/solaredge"}` and `AC_Power`
-- In Grafana Cloud Logs, query `{service_name="solaredge-exporter", job="integrations/solaredge"}`
+- In Grafana Cloud Logs, query `{service_name="solaredge-exporter", job="integrations/solaredge"}` for exporter logs. For the collector's own logs, query `{job="integrations/alloy", collector_id="solaredge"}`.
 
 Exporter logs are JSON lines, at info level. A healthy process logs startup once, then only Modbus errors and reconnects. The stream labels are `service_name` and `job`. `job` is `integrations/solaredge`, the same value as the scrape. The inverter address is in the line body, not a label, because a DHCP lease can move it. Debug logging stays off: it writes a line every 5 seconds. Alloy remembers the byte offset in the file, so a restart does not send those lines again.
 
@@ -142,7 +142,7 @@ gcx resources push alertrules -p alerting
 
 ## Fleet Management
 
-[`alloy/config.alloy`](alloy/config.alloy) is now only the bootstrap. It registers the collector with Fleet Management and is the only local Alloy config Compose loads. [`fleet/solaredge.alloy`](fleet/solaredge.alloy) is the pipeline, published to the `lewism` stack's Fleet Management by [`.github/workflows/fleet-management-sync.yml`](.github/workflows/fleet-management-sync.yml), using [`grafana/fleet-management-sync-action@v0.3.0`](https://github.com/grafana/fleet-management-sync-action). The pipeline is [`fleet/solaredge.yaml`](fleet/solaredge.yaml) with matcher `integration=solaredge`, in namespace `solaredge-olly`.
+[`alloy/config.alloy`](alloy/config.alloy) is the bootstrap. It registers the collector with Fleet Management and ships the collector's own logs to Grafana Cloud Logs. It is the only local Alloy config Compose loads. [`fleet/solaredge.alloy`](fleet/solaredge.alloy) is the pipeline, published to the `lewism` stack's Fleet Management by [`.github/workflows/fleet-management-sync.yml`](.github/workflows/fleet-management-sync.yml), using [`grafana/fleet-management-sync-action@v0.3.0`](https://github.com/grafana/fleet-management-sync-action). The pipeline is [`fleet/solaredge.yaml`](fleet/solaredge.yaml) with matcher `integration=solaredge`, in namespace `solaredge-olly`.
 
 The workflow runs a format check and a validation against [`module/metrics.alloy`](module/metrics.alloy). Pull requests into `main` run the action as a dry run. Pushes to `main` and manual runs sync for real. It needs these repository secrets:
 
@@ -150,9 +150,9 @@ The workflow runs a format check and a validation against [`module/metrics.alloy
 - `FM_USERNAME` is the numeric Fleet Management instance id from the same tab. The stack slug is rejected.
 - `FM_TOKEN` is the access-policy token alone, with `fleet-management:write`. No `username:token` prefix and no trailing newline.
 
-Compose passes `FLEET_MANAGEMENT_URL` and `FLEET_MANAGEMENT_USERNAME` from `.env`, and `GCLOUD_RW_API_KEY` from the metrics token. The collector id is the fixed string `solaredge`, so a container recreate does not register a new collector.
+Compose passes `FLEET_MANAGEMENT_URL` and `FLEET_MANAGEMENT_USERNAME` from `.env`, and `GCLOUD_RW_API_KEY` from the metrics token. The collector id is the fixed string `solaredge`, so a container recreate does not register a new collector. Compose also sets `GCLOUD_FM_COLLECTOR_ID=solaredge`, which the generated Fleet Management pipelines read.
 
-The collector's local config is only the bootstrap. The module stays mounted at `/etc/alloy/module/metrics.alloy`, which the remote pipeline imports. Secrets stay in the environment.
+The collector's local config is only the bootstrap: the `remotecfg` block and a `logging` tee that sends Alloy's own logs to Loki with `job="integrations/alloy"` and `collector_id="solaredge"`. The generated `self_monitoring_logs_linux` pipeline reads the systemd journal, which this container does not have, so the tee is required for the Fleet Management Logs tab to show anything. The module stays mounted at `/etc/alloy/module/metrics.alloy`, which the remote pipeline imports. Secrets stay in the environment.
 
 ```alloy
 remotecfg {
@@ -224,6 +224,8 @@ Each chapter gets its own directory when it is implemented.
 **No samples in Grafana Cloud.** Open the Alloy UI and confirm `solaredge.scrape.inverter` is healthy. Then check the Cloud access policy includes `metrics:write`, and that the URL, instance id, and token match the stack.
 
 **No exporter logs in Grafana Cloud.** Confirm `loki.source.file.exporter` is tailing `/var/log/solaredge/solaredge-exporter.log` and `loki.write.cloud` is healthy. The access policy needs `logs:write`. `GRAFANA_CLOUD_LOKI_USERNAME` is the Loki instance id, not the Prometheus one, and the URL must end in `/loki/api/v1/push`.
+
+**No collector logs in Fleet Management.** Collector logs are Alloy's own logs, a different stream from exporter logs. The bootstrap `logging` block in [`alloy/config.alloy`](alloy/config.alloy) writes them to Loki. Query `{job="integrations/alloy", collector_id="solaredge"}` to confirm they arrive. In the Alloy UI, `self_monitoring_logs_linux` may show an unhealthy `loki.source.journal`. That is expected in this container, which has no systemd journal. Leave the generated pipeline enabled, because disabling it affects every Linux collector on the stack. The lines that matter come from the `logging` tee, not from the journal readers.
 
 **Another Modbus client is already connected.** The inverter accepts one client. Disconnect the other client and restart `solaredge-exporter`.
 
