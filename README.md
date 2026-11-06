@@ -147,8 +147,8 @@ gcx resources push alertrules -p alerting
 The workflow runs a format check, a validation against [`module/metrics.alloy`](module/metrics.alloy), and a diff requiring `alloy/config.alloy` and `fleet/solaredge.alloy` to match. Pull requests into `main` run the action as a dry run. Pushes to `main` and manual runs sync for real. It needs these repository secrets:
 
 - `FM_URL` is the Fleet Management base URL from Connections, Fleet Management, API.
-- `FM_USERNAME` is the Fleet Management instance id from the same tab.
-- `FM_TOKEN` is an access-policy token with `fleet-management:write`.
+- `FM_USERNAME` is the numeric Fleet Management instance id from the same tab. The stack slug is rejected.
+- `FM_TOKEN` is the access-policy token alone, with `fleet-management:write`. No `username:token` prefix and no trailing newline.
 
 Until a real sync has succeeded and the bootstrap change has been made, the collector keeps loading [`alloy/config.alloy`](alloy/config.alloy) from disk.
 
