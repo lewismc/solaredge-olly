@@ -26,9 +26,9 @@ concurrency:
 
 jobs:
   validate:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7.0.1
 
       - name: Check formatting
         run: |
@@ -50,17 +50,71 @@ jobs:
 
   sync:
     needs: validate
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7.0.1
+
+      # v0.3.0's composite action pins actions/setup-go to a Node 20
+      # release and points the Go cache at a path outside the workspace.
+      # Both produce annotations on every run. Checking the action out
+      # here lets setup-go cache .fm-sync/go.sum inside the workspace.
+      - name: Checkout fleet-management-sync-action
+        uses: actions/checkout@v7.0.1
+        with:
+          repository: grafana/fleet-management-sync-action
+          ref: v0.3.0
+          path: .fm-sync
+
+      - uses: actions/setup-go@v7.0.0
+        with:
+          go-version-file: .fm-sync/go.mod
+          cache-dependency-path: .fm-sync/go.sum
 
       - name: Sync pipelines to Fleet Management
-        uses: grafana/fleet-management-sync-action@v0.3.0
-        with:
-          pipelines-root-path: fleet
-          fm-url: ${{ secrets.FM_URL }}
-          fm-username: ${{ secrets.FM_USERNAME }}
-          fm-token: ${{ secrets.FM_TOKEN }}
-          namespace: solaredge-olly
-          verbose: 'true'
-          dry-run: ${{ github.event_name == 'pull_request' }}
+        working-directory: .fm-sync
+        env:
+          FM_URL: ${{ secrets.FM_URL }}
+          FM_USERNAME: ${{ secrets.FM_USERNAME }}
+          FM_TOKEN: ${{ secrets.FM_TOKEN }}
+          DRY_RUN: ${{ github.event_name == 'pull_request' }}
+        run: |
+          trim() {
+            local v="$1"
+            v="${v#"${v%%[![:space:]]*}"}"
+            v="${v%"${v##*[![:space:]]}"}"
+            printf '%s' "$v"
+          }
+          url=$(trim "$FM_URL")
+          user=$(trim "$FM_USERNAME")
+          token=$(trim "$FM_TOKEN")
+          url="${url%/}"
+          if [ -z "$url" ] || [ -z "$user" ] || [ -z "$token" ]; then
+            echo "::error::FM_URL, FM_USERNAME, and FM_TOKEN must be set."
+            exit 1
+          fi
+          case "$user" in
+            *[!0-9]*)
+              echo "::error::FM_USERNAME must be the numeric Fleet Management instance id from the API tab, not the stack slug."
+              exit 1
+              ;;
+          esac
+          case "$token" in
+            *[[:space:]]*)
+              echo "::error::FM_TOKEN still contains whitespace. Recreate the secret as a single line."
+              exit 1
+              ;;
+            *:*)
+              echo "::error::FM_TOKEN must be the access-policy token only, not username:token."
+              exit 1
+              ;;
+          esac
+          export INPUT_FM_URL="$url"
+          export INPUT_FM_USERNAME="$user"
+          export INPUT_FM_TOKEN="$token"
+          export INPUT_TIMEOUT=1m
+          export INPUT_VERBOSE=true
+          export INPUT_DRY_RUN="$DRY_RUN"
+          export INPUT_NAMESPACE=solaredge-olly
+          export INPUT_GLOBAL_MATCHER=
+          export INPUT_PIPELINES_ROOT_PATH="${GITHUB_WORKSPACE}/fleet"
+          go run cmd/sync/main.go
