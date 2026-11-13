@@ -106,6 +106,10 @@ Shell values override `.env` for that command. `sunspec-sim` must be healthy bef
 
 Stop the stack with `docker compose --profile sim down` when the simulator was started, so the profile container is removed too.
 
+## Raspberry Pi
+
+On the Pi the same processes run under systemd, with no Docker. [`deploy/pi/`](deploy/pi/) holds the units, a non-secret env example, and the layout. `solaredge-exporter`, `solaredge-geolocate`, and `alloy` are enabled for `multi-user.target`, so they start at every boot. The simulator unit is enabled only while proving the path, then disabled so a later boot does not open a second Modbus listener. Alloy's HTTP port, the exporter, geolocate, and the simulator all listen on localhost.
+
 ## Module
 
 Scrape settings, the keep-list, and the `forward_to` receiver live in [`module/metrics.alloy`](module/metrics.alloy). The default keep-list is `up`, `SunSpec_*`, `AC_*`, `DC_*`, `Temp_*`, `Status*`, `Inverter_Info`, `M_*`, `M2_*`, and `M3_*`. Exporter `go_*` series are dropped. See [`module/README.md`](module/README.md). Exporter log shipping lives in [`fleet/solaredge.alloy`](fleet/solaredge.alloy), not in that module.
@@ -178,7 +182,7 @@ Alloy's own metrics reach Grafana Cloud from two pipelines. The generated `self_
 
 ## Synthetic monitoring
 
-[`synthetic/exporter-http.yaml`](synthetic/exporter-http.yaml) is a k6 check, job `solaredge-exporter-metrics`, every 60 seconds, timeout 15 seconds, probe `solaredge`. The script is [`synthetic/exporter-metrics.js`](synthetic/exporter-metrics.js). It fails when a sample line for `SunSpec_DID`, `Status`, `AC_Power`, or `AC_Power_SF` is missing. `AC_Power{` does not match `AC_Power_SF`. It does not read phase B, phase C, a meter, `/health`, or `Modbus_Read_OK`. A dead Modbus session after the first good poll still passes, because those series stay on the exporter until the process restarts.
+[`synthetic/exporter-http.yaml`](synthetic/exporter-http.yaml) is a MultiHTTP check, job `solaredge-exporter-metrics`, every 60 seconds, timeout 15 seconds, probe `solaredge`. Its assertions require HTTP 200 and a body that contains `SunSpec_DID{`, `Status{`, `AC_Power{`, and `AC_Power_SF{`. `AC_Power{` does not match `AC_Power_SF`. It does not read phase B, phase C, a meter, `/health`, or `Modbus_Read_OK`. A dead Modbus session after the first good poll still passes, because those series stay on the exporter until the process restarts. The request URL is `http://127.0.0.1:2112/metrics` because the API rejects the single-label hostname on a MultiHTTP request; the check target stays `http://solaredge-exporter:2112/metrics`. The check label `service_name=solaredge-exporter` is the same value as the exporter log stream.
 
 The agent image is pinned to `v0.68.0`. Its command includes `--blocked-nets=0.0.0.0/32`, which turns off the agent's default `10.0.0.0/8` denylist so the probe can open the Compose address. No ports are published. `alertSensitivity` is `none`. No contact point is committed.
 
@@ -188,7 +192,7 @@ gcx synthetic-monitoring checks create -f synthetic/exporter-http.yaml
 
 ## SLOs
 
-[`slo/`](slo/) holds two Grafana Cloud SLOs, objective 0.99 over 28 days. `metadata.name` is empty so the file does not pin one stack's UUID. Both set `spec.labels` to `service_name=solaredge`. The SLO app reads that key for the service column and the insights "Missing service label" count. A label named `service` does not count. Fast-burn and slow-burn alerts each carry an `assistantInvestigation` enrichment, so a firing burn alert starts an Assistant investigation. `gcx resources push` treats that empty name as a single object, so push one file at a time. No contact point is committed. There is no energy SLO.
+[`slo/`](slo/) holds two Grafana Cloud SLOs, objective 0.99 over 28 days. `metadata.name` is empty so the file does not pin one stack's UUID. Both set `spec.labels` to `service_name=solaredge-exporter`. The SLO app reads that key for the service column and the insights "Missing service label" count. A label named `service` does not count. Fast-burn and slow-burn alerts each carry an `assistantInvestigation` enrichment, so a firing burn alert starts an Assistant investigation. `gcx resources push` treats that empty name as a single object, so push one file at a time. No contact point is committed. There is no energy SLO.
 
 `Modbus_Read_OK` is the poll gauge from [`exporter/modbus-read-ok.patch`](exporter/modbus-read-ok.patch). It is 1 after a poll publishes the inverter model, and it stays 1 between polls. It goes to 0 only when a connect, a read, or a parse fails, and the next successful poll sets it back to 1. A meter error later in the poll does not clear it. An earlier revision reset the gauge to 0 at the start of every poll, so a scrape that landed during a good read recorded a failure. The poll-success SLO history therefore starts over at this change, and its earlier values are not comparable. `Inverter_Info` stays the once-at-startup series. The keep-list in [`module/metrics.alloy`](module/metrics.alloy) includes the gauge.
 
@@ -213,7 +217,7 @@ Each chapter gets its own directory when it is implemented.
 
 1. **Alerts** in [`alerting/`](alerting/). Implemented.
 2. **Fleet Management** in [`fleet/solaredge.alloy`](fleet/solaredge.alloy). Implemented. [`alloy/config.alloy`](alloy/config.alloy) is the `remotecfg` bootstrap.
-3. **Synthetic monitoring** in [`synthetic/`](synthetic/). Implemented. The private probe starts with `docker compose up`. The k6 check does not prove the inverter answered the latest poll.
+3. **Synthetic monitoring** in [`synthetic/`](synthetic/). Implemented. The private probe runs on the Pi. The MultiHTTP check does not prove the inverter answered the latest poll.
 4. **SLOs** in [`slo/`](slo/). Implemented. Poll success, and fault-free among successful polls. No energy SLO.
 5. **Geolocation and expected yield** in [`geolocate/`](geolocate/). Implemented. No alert or SLO on expected yield yet.
 

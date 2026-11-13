@@ -1,0 +1,20 @@
+[Unit]
+Description=SunSpec Modbus TCP simulator
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=sunspec
+Group=sunspec
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE
+WorkingDirectory=/opt/solaredge/sim
+EnvironmentFile=/etc/solaredge/solaredge.env
+ExecStart=/opt/solaredge/sim/venv/bin/python -u /opt/solaredge/sim/server.py
+Restart=on-failure
+RestartSec=5
+MemoryMax=64M
+
+[Install]
+WantedBy=multi-user.target

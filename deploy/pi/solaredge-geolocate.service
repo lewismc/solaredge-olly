@@ -1,0 +1,18 @@
+[Unit]
+Description=SolarEdge site geolocation and expected-yield exporter
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=geolocate
+Group=geolocate
+WorkingDirectory=/opt/solaredge/geolocate
+EnvironmentFile=/etc/solaredge/solaredge.env
+ExecStart=/opt/solaredge/geolocate/venv/bin/python -u /opt/solaredge/geolocate/server.py
+Restart=on-failure
+RestartSec=5
+MemoryMax=64M
+
+[Install]
+WantedBy=multi-user.target

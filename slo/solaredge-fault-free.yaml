@@ -10,7 +10,7 @@ spec:
   description: Among polls that published the inverter model, fraction where Status is not Fault (7).
   labels:
     - key: service_name
-      value: solaredge
+      value: solaredge-exporter
   destinationDatasource:
     uid: grafanacloud-prom
   query:
