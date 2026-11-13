@@ -1,0 +1,54 @@
+name: Watch Alloy releases
+
+on:
+  schedule:
+    - cron: "17 15 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  pin:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7.0.1
+
+      - name: Open a pin bump when Alloy has a newer stable tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          pin=$(tr -d '[:space:]' < alloy/VERSION)
+          latest=$(gh api repos/grafana/alloy/releases/latest --jq .tag_name)
+          case "$latest" in
+            v*.*.*) ;;
+            *) echo "skip non-stable tag $latest"; exit 0 ;;
+          esac
+          case "$latest" in
+            *-*|*rc*|*beta*|*alpha*) echo "skip pre-release $latest"; exit 0 ;;
+          esac
+          newest=$(printf '%s\n%s\n' "$pin" "$latest" | sort -V | tail -1)
+          if [ "$newest" = "$pin" ]; then
+            echo "pin $pin is current"
+            exit 0
+          fi
+          branch="alloy-pin-${latest}"
+          if gh pr list --head "$branch" --state open --json number --jq 'length' | grep -qx 1; then
+            echo "pull request for $branch already open"
+            exit 0
+          fi
+          git checkout -b "$branch"
+          printf '%s\n' "$latest" > alloy/VERSION
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add alloy/VERSION
+          git commit -m "chore(alloy): pin ${latest}"
+          git push -u origin "$branch"
+          gh pr create --title "chore(alloy): pin ${latest}" --body "## Summary
+- Bumps \`alloy/VERSION\` from \`${pin}\` to \`${latest}\`.
+- The ARMv6 build has to pass on this pull request before merge. Merge publishes the release the Pi pulls.
+
+## Test plan
+- [ ] The ARMv6 release workflow builds Alloy and the exporter and the qemu smoke test passes."

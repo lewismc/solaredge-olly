@@ -106,6 +106,10 @@ Shell values override `.env` for that command. `sunspec-sim` must be healthy bef
 
 Stop the stack with `docker compose --profile sim down` when the simulator was started, so the profile container is removed too.
 
+## Raspberry Pi
+
+On the Pi the same processes run under systemd, with no Docker. [`deploy/pi/`](deploy/pi/) holds the units, a non-secret env example, and the layout. `solaredge-exporter`, `solaredge-geolocate`, and `alloy` are enabled for `multi-user.target`, so they start at every boot. The simulator unit is enabled only while proving the path, then disabled so a later boot does not open a second Modbus listener. Alloy's HTTP port, the exporter, geolocate, and the simulator all listen on localhost.
+
 ## Module
 
 Scrape settings, the keep-list, and the `forward_to` receiver live in [`module/metrics.alloy`](module/metrics.alloy). The default keep-list is `up`, `SunSpec_*`, `AC_*`, `DC_*`, `Temp_*`, `Status*`, `Inverter_Info`, `M_*`, `M2_*`, and `M3_*`. Exporter `go_*` series are dropped. See [`module/README.md`](module/README.md). Exporter log shipping lives in [`fleet/solaredge.alloy`](fleet/solaredge.alloy), not in that module.

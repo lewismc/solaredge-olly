@@ -31,6 +31,7 @@ IPINFO_URL = "https://ipinfo.io/json"
 OPEN_METEO_URL = "https://api.open-meteo.com/v1/forecast"
 
 LISTEN_PORT = int(os.environ.get("GEOLOCATE_PORT", "9110"))
+LISTEN_ADDR = os.environ.get("GEOLOCATE_LISTEN_ADDR", "0.0.0.0")
 CACHE_PATH = os.environ.get("GEOLOCATE_CACHE", "/var/lib/geolocate/location.json")
 
 LOCATION_TTL_S = 24 * 3600      # ipinfo lookup at most once per day
@@ -377,8 +378,8 @@ def main():
     startup_location(state)
 
     REGISTRY.register(SiteCollector(state, pv))
-    start_http_server(LISTEN_PORT, addr="0.0.0.0")
-    log("info", "geolocate exporter listening", port=LISTEN_PORT, tilt=pv["tilt"], azimuth=pv["azimuth"],
+    start_http_server(LISTEN_PORT, addr=LISTEN_ADDR)
+    log("info", "geolocate exporter listening", addr=LISTEN_ADDR, port=LISTEN_PORT, tilt=pv["tilt"], azimuth=pv["azimuth"],
         kwp=pv["kwp"], pr=pv["pr"], ac_limit_w=pv["ac_limit_w"])
 
     stop = threading.Event()

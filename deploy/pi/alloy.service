@@ -1,0 +1,18 @@
+[Unit]
+Description=Grafana Alloy SolarEdge collector
+After=network-online.target solaredge-exporter.service solaredge-geolocate.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=alloy
+Group=alloy
+SupplementaryGroups=solaredge
+EnvironmentFile=/etc/solaredge/solaredge.env
+ExecStart=/opt/solaredge/bin/alloy run --server.http.listen-addr=127.0.0.1:12345 --storage.path=/var/lib/alloy/data /etc/alloy/solaredge.alloy
+Restart=on-failure
+RestartSec=5
+MemoryMax=220M
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,18 @@
+[Unit]
+Description=SolarEdge Modbus Prometheus exporter
+After=network-online.target sunspec-sim.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=solaredge
+Group=solaredge
+UMask=0027
+EnvironmentFile=/etc/solaredge/solaredge.env
+ExecStart=/opt/solaredge/bin/solaredge-exporter
+Restart=on-failure
+RestartSec=5
+MemoryMax=64M
+
+[Install]
+WantedBy=multi-user.target
