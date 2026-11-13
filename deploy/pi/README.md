@@ -8,6 +8,7 @@ The collector runs as ordinary processes under systemd. Docker is not required a
 | `solaredge-exporter.service` | `127.0.0.1:2112` | 64M | Enabled |
 | `solaredge-geolocate.service` | `127.0.0.1:9110` | 64M | Enabled |
 | `alloy.service` | `127.0.0.1:12345` | 220M | Enabled |
+| `synthetic-monitoring-agent.service` | `127.0.0.1:4050` | 96M | Enabled. Installed by hand; a release does not ship the probe or k6 |
 
 `solaredge-exporter`, `solaredge-geolocate`, and `alloy` are installed into `multi-user.target`, so they start at every boot and wait for `network-online.target`. `sunspec-sim` is enabled during the simulator phase and disabled at cutover, so a later boot does not open a second Modbus listener.
 
