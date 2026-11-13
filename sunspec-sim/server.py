@@ -10,6 +10,7 @@ SunSpec_DID. No meter blocks (v1).
 from __future__ import annotations
 
 import logging
+import os
 
 from pymodbus.datastore import (
     ModbusSequentialDataBlock,
@@ -114,12 +115,14 @@ def main() -> None:
     store = ModbusSlaveContext(hr=ModbusSequentialDataBlock(0, holding), zero_mode=True)
     context = ModbusServerContext(slaves=store, single=True)
 
+    listen = os.environ.get("SIM_LISTEN_ADDR", "0.0.0.0")
     LOG.info(
-        "SunSpec simulator listening on 0.0.0.0:502 (common@%d, inverter@%d)",
+        "SunSpec simulator listening on %s:502 (common@%d, inverter@%d)",
+        listen,
         COMMON_BASE,
         INVERTER_BASE,
     )
-    StartTcpServer(context=context, address=("0.0.0.0", 502))
+    StartTcpServer(context=context, address=(listen, 502))
 
 
 if __name__ == "__main__":

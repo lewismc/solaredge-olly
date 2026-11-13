@@ -1,0 +1,106 @@
+name: ARMv6 release
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: alloy-armv6-build-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v7.0.1
+
+      - uses: actions/setup-go@v7.0.0
+        with:
+          go-version: "1.27.3"
+
+      - name: Build Alloy
+        run: |
+          set -euo pipefail
+          version=$(tr -d '[:space:]' < alloy/VERSION)
+          git clone --depth 1 --branch "$version" https://github.com/grafana/alloy.git /tmp/alloy
+          git -C /tmp/alloy apply "$GITHUB_WORKSPACE/alloy/patches/fanout-align.patch"
+          cd /tmp/alloy/collector
+          CGO_ENABLED=0 GOOS=linux GOARCH=arm GOARM=6 \
+            go build -tags netgo -ldflags "-s -w" -o "$GITHUB_WORKSPACE/alloy-linux-armv6" .
+
+      - name: Build the exporter
+        run: |
+          set -euo pipefail
+          sha=42d4790b78f76a5fae9e931cf78a76dbda0ccb53
+          git clone https://github.com/dave92082/SolarEdge-Exporter.git /tmp/solaredge-exporter
+          git -C /tmp/solaredge-exporter checkout "$sha"
+          git -C /tmp/solaredge-exporter apply "$GITHUB_WORKSPACE/exporter/inverter-info.patch"
+          git -C /tmp/solaredge-exporter apply "$GITHUB_WORKSPACE/exporter/modbus-read-ok.patch"
+          git -C /tmp/solaredge-exporter apply "$GITHUB_WORKSPACE/exporter/modbus-read-errors.patch"
+          cd /tmp/solaredge-exporter
+          CGO_ENABLED=0 GOOS=linux GOARCH=arm GOARM=6 \
+            go build -ldflags "-s -w" -o "$GITHUB_WORKSPACE/solaredge-exporter-linux-armv6" .
+
+      - name: Pack the config bundle
+        run: |
+          set -euo pipefail
+          tar -czf solaredge-bundle.tar.gz \
+            alloy/config.alloy \
+            alloy/VERSION \
+            fleet \
+            module \
+            deploy/pi \
+            geolocate/server.py \
+            geolocate/requirements.txt \
+            sunspec-sim/server.py \
+            sunspec-sim/requirements.txt
+
+      - name: Smoke test under qemu
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y qemu-user-static
+          qemu-arm-static "$GITHUB_WORKSPACE/alloy-linux-armv6" --version
+          sudo mkdir -p /etc/alloy/module
+          sudo cp module/metrics.alloy /etc/alloy/module/metrics.alloy
+          export GRAFANA_CLOUD_PROM_URL=http://127.0.0.1/api/prom/push
+          export GRAFANA_CLOUD_PROM_USERNAME=1
+          export GRAFANA_CLOUD_PROM_PASSWORD=x
+          export GRAFANA_CLOUD_LOKI_URL=http://127.0.0.1/loki/api/v1/push
+          export GRAFANA_CLOUD_LOKI_USERNAME=1
+          export GRAFANA_CLOUD_LOKI_PASSWORD=x
+          export FLEET_MANAGEMENT_URL=http://127.0.0.1
+          export FLEET_MANAGEMENT_USERNAME=1
+          export GCLOUD_RW_API_KEY=x
+          export GCLOUD_FM_COLLECTOR_ID=solaredge
+          qemu-arm-static "$GITHUB_WORKSPACE/alloy-linux-armv6" validate alloy/config.alloy
+          qemu-arm-static "$GITHUB_WORKSPACE/alloy-linux-armv6" validate fleet/solaredge.alloy
+          file "$GITHUB_WORKSPACE/solaredge-exporter-linux-armv6" | grep -q 'ARM'
+
+      - name: Checksums
+        run: |
+          set -euo pipefail
+          sha256sum alloy-linux-armv6 solaredge-exporter-linux-armv6 solaredge-bundle.tar.gz > SHA256SUMS
+
+      - name: Publish the release
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          version=$(tr -d '[:space:]' < alloy/VERSION)
+          tag="${version}-${GITHUB_SHA::7}"
+          gh release create "$tag" \
+            --title "$tag" \
+            --notes "linux/arm/v6 Alloy ${version} and the patched SolarEdge exporter. Built from ${GITHUB_SHA}." \
+            alloy-linux-armv6 \
+            solaredge-exporter-linux-armv6 \
+            solaredge-bundle.tar.gz \
+            SHA256SUMS

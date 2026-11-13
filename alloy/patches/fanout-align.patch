@@ -1,0 +1,28 @@
+diff --git a/internal/component/prometheus/fanout.go b/internal/component/prometheus/fanout.go
+index 596412da1..0d92e1163 100644
+--- a/internal/component/prometheus/fanout.go
++++ b/internal/component/prometheus/fanout.go
+@@ -27,7 +27,10 @@ var _ storage.Appendable = (*Fanout)(nil)
+ // Fanout supports the default Alloy style of appendables since it can go to multiple outputs. It also allows the intercepting of appends.
+ // It also maintains the responsibility of assigning global ref IDs to a series via the label store.
+ type Fanout struct {
+-	mut sync.RWMutex
++	// lastSeriesCount is first so the 64-bit atomic stays 8-byte aligned on
++	// 32-bit ARM. Go panics on an unaligned 64-bit atomic on ARMv6.
++	lastSeriesCount atomic.Int64
++	mut             sync.RWMutex
+ 	// children is where to fan out.
+ 	children []storage.Appendable
+ 	// ComponentID is what component this belongs to.
+@@ -36,9 +39,8 @@ type Fanout struct {
+ 	samplesCounter prometheus.Counter
+ 	ls             labelstore.LabelStore
+ 
+-	// lastSeriesCount stores the number of series that were sent through the last appender. It helps to estimate how
+-	// much memory to allocate for the staleness trackers.
+-	lastSeriesCount atomic.Int64
++	// lastSeriesCount (first field) stores the number of series sent through the last appender.
++	// It estimates how much memory to allocate for the staleness trackers.
+ 
+ 	useLabelStore         bool
+ 	seriesRefMappingStore *appenders.SeriesRefMappingStore

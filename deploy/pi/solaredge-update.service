@@ -1,0 +1,9 @@
+[Unit]
+Description=Pull the latest SolarEdge armv6 release
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/opt/solaredge/bin/solaredge-update
+Nice=10
