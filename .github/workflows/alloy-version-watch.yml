@@ -46,9 +46,12 @@ jobs:
           git add alloy/VERSION
           git commit -m "chore(alloy): pin ${latest}"
           git push -u origin "$branch"
-          gh pr create --title "chore(alloy): pin ${latest}" --body "## Summary
-- Bumps \`alloy/VERSION\` from \`${pin}\` to \`${latest}\`.
-- The ARMv6 build has to pass on this pull request before merge. Merge publishes the release the Pi pulls.
-
-## Test plan
-- [ ] The ARMv6 release workflow builds Alloy and the exporter and the qemu smoke test passes."
+          {
+            echo "## Summary"
+            echo "- Bumps \`alloy/VERSION\` from \`${pin}\` to \`${latest}\`."
+            echo "- The ARMv6 build has to pass on this pull request before merge. Merge publishes the release the Pi pulls."
+            echo
+            echo "## Test plan"
+            echo "- [ ] The ARMv6 release workflow builds Alloy and the exporter and the qemu smoke test passes."
+          } > /tmp/pr-body.md
+          gh pr create --title "chore(alloy): pin ${latest}" --body-file /tmp/pr-body.md
