@@ -96,7 +96,17 @@ if [ -n "$STAGE" ]; then
   fi
 else
   meta=$(mktemp)
-  curl -fsSL "https://api.github.com/repos/${REPO}/releases/latest" -o "$meta"
+  code=$(curl -sS -o "$meta" -w '%{http_code}' "https://api.github.com/repos/${REPO}/releases/latest")
+  if [ "$code" = "404" ]; then
+    log "no release published yet"
+    rm -f "$meta"
+    exit 0
+  fi
+  if [ "$code" != "200" ]; then
+    log "GitHub API returned $code"
+    rm -f "$meta"
+    exit 1
+  fi
   tag=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["tag_name"])' "$meta")
   if [ "$tag" = "$prev" ]; then
     log "already on $tag"
