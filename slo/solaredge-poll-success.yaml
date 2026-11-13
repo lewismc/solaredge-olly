@@ -10,7 +10,7 @@ spec:
   description: Fraction of polls where the inverter model block was published.
   labels:
     - key: service_name
-      value: solaredge
+      value: solaredge-exporter
   destinationDatasource:
     uid: grafanacloud-prom
   query:

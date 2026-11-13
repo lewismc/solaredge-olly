@@ -1,0 +1,15 @@
+[Unit]
+Description=Grafana Synthetic Monitoring private probe
+After=network-online.target solaredge-exporter.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/var/lib/sm
+ExecStart=/opt/solaredge/bin/synthetic-monitoring-agent-run
+Restart=on-failure
+RestartSec=5
+MemoryMax=96M
+
+[Install]
+WantedBy=multi-user.target
