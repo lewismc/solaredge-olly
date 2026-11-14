@@ -1,0 +1,298 @@
+# Knowledge Graph custom model rules for the SolarEdge home stack.
+# Upload with: gcx kg model-rules upsert -f knowledge-graph/model-rules.yaml
+#
+# Only label names appear here. Values come from the series at evaluation time, so
+# no site identifier, IP address, or serial number is committed.
+#
+# Node, Service, ServiceInstance, and Process are discovered automatically from the
+# Raspberry Pi integration and the scrape jobs, so they are not redefined here.
+#
+# Scope: the env scope must come from a label named asserts_env. The entity name is
+# also a label on the series, not a property mapped from a differently named label.
+# Each relation endpoint declares one scope key only.
+name: solaredge-home
+entities:
+  # Geolocate publishes the site location and the expected-yield model. Its series carry
+  # no site-identifying label, so the Site is a single static entity.
+  - type: Site
+    name: site
+    scope:
+      env: asserts_env
+    definedStatically:
+      - name: solaredge-site
+        scope:
+          env: home
+
+  # One Inverter per inverter label. Inverter_Info carries the make and model. The
+  # exporter's log lines describe its inverter, so job maps the Inverter to them too.
+  - type: Inverter
+    name: inverter
+    scope:
+      env: asserts_env
+    definedBy:
+      - query: |
+          label_replace(
+            Inverter_Info{job="integrations/solaredge"},
+            "asserts_env", "$1", "deployment_environment", "(.*)"
+          )
+        labelValues:
+          inverter: inverter
+          manufacturer: manufacturer
+          model: model
+          job: job
+
+  # The exporter is the process that polls the inverter over Modbus. Its scrape instance
+  # is the name, so Exporter links to the inverter through the inverter label. job is
+  # also the exporter's Loki stream label, so log-config.json can map it.
+  - type: Exporter
+    name: exporter
+    scope:
+      env: asserts_env
+    definedBy:
+      - query: |
+          label_replace(
+            Modbus_Read_OK{job="integrations/solaredge", asserts_env!=""},
+            "exporter", "$1", "instance", "(.*)"
+          )
+        labelValues:
+          exporter: exporter
+          inverter: inverter
+          job: job
+
+  # The Alloy instance that runs the pipeline, named by its Fleet Management collector_id.
+  - type: Collector
+    name: collector
+    scope:
+      env: asserts_env
+    definedBy:
+      - query: |
+          label_replace(
+            label_replace(
+              alloy_build_info{job="integrations/alloy"},
+              "asserts_env", "home", "job", ".*"
+            ),
+            "collector", "$1", "collector_id", "(.*)"
+          )
+        labelValues:
+          collector: collector
+          version: version
+
+relations:
+  # The site contains its inverter. The static Site has no series of its own, so the
+  # pattern adds a fixed site label to the inverter series, and that label matches the
+  # Site's name.
+  - type: CONTAINS
+    startEntityType: Site
+    endEntityType: Inverter
+    definedBy:
+      source: METRICS
+      pattern: |
+        label_replace(
+          label_replace(
+            Inverter_Info{job="integrations/solaredge"},
+            "asserts_env", "$1", "deployment_environment", "(.*)"
+          ),
+          "site", "solaredge-site", "job", ".*"
+        )
+      startEntityMatchers:
+        name: site
+        env: asserts_env
+      endEntityMatchers:
+        inverter: inverter
+        env: asserts_env
+
+  # The exporter polls the inverter over Modbus. Modbus_Read_OK carries both the exporter
+  # instance and the inverter label on one series.
+  - type: POLLS
+    startEntityType: Exporter
+    endEntityType: Inverter
+    definedBy:
+      source: METRICS
+      pattern: |
+        label_replace(
+          Modbus_Read_OK{job="integrations/solaredge", asserts_env!=""},
+          "exporter", "$1", "instance", "(.*)"
+        )
+      startEntityMatchers:
+        name: exporter
+        env: asserts_env
+      endEntityMatchers:
+        inverter: inverter
+        env: asserts_env
+
+  # The collector runs on the host. alloy_build_info carries the collector id and the
+  # host instance on one series. Node is discovered by the Raspberry Pi integration and
+  # is not redefined here. Its only scope key is env.
+  - type: RUNS_ON
+    startEntityType: Collector
+    endEntityType: Node
+    definedBy:
+      source: METRICS
+      pattern: |
+        label_replace(
+          label_replace(
+            alloy_build_info{job="integrations/alloy"},
+            "asserts_env", "home", "job", ".*"
+          ),
+          "collector", "$1", "collector_id", "(.*)"
+        )
+      startEntityMatchers:
+        name: collector
+        env: asserts_env
+      endEntityMatchers:
+        name: instance
+        env: asserts_env
+
+  # The solaredge exporter is scraped by the built-in Service integrations/solaredge.
+  # The up series carries the job and the scrape instance, so the exporter name comes
+  # from the instance label, and the Service name is the job label.
+  - type: SCRAPES
+    startEntityType: Service
+    endEntityType: Exporter
+    definedBy:
+      source: METRICS
+      pattern: |
+        label_replace(
+          up{job="integrations/solaredge", asserts_env!=""},
+          "exporter", "$1", "instance", "(.*)"
+        )
+      startEntityMatchers:
+        name: job
+        env: asserts_env
+      endEntityMatchers:
+        name: exporter
+        env: asserts_env
+
+  # The exporter is the built-in ServiceInstance integrations/solaredge:<instance>. The
+  # same up series joins the two, through a label built from job and instance.
+  - type: SCRAPED_AS
+    startEntityType: Exporter
+    endEntityType: ServiceInstance
+    definedBy:
+      source: METRICS
+      pattern: |
+        label_join(
+          label_replace(
+            up{job="integrations/solaredge", asserts_env!=""},
+            "exporter", "$1", "instance", "(.*)"
+          ),
+          "si", ":", "job", "instance"
+        )
+      startEntityMatchers:
+        name: exporter
+        env: asserts_env
+      endEntityMatchers:
+        name: si
+        env: asserts_env
+
+  # The Alloy pipeline is the built-in Process integrations/alloy:<instance>, and the
+  # collector id lives on the same alloy_build_info series.
+  - type: RUNS
+    startEntityType: Collector
+    endEntityType: Process
+    definedBy:
+      source: METRICS
+      pattern: |
+        label_join(
+          label_replace(
+            label_replace(
+              alloy_build_info{job="integrations/alloy"},
+              "asserts_env", "home", "job", ".*"
+            ),
+            "collector", "$1", "collector_id", "(.*)"
+          ),
+          "proc", ":", "job", "instance"
+        )
+      startEntityMatchers:
+        name: collector
+        env: asserts_env
+      endEntityMatchers:
+        name: proc
+        env: asserts_env
+
+  # The geolocate service describes the site. Its series have no environment label, so
+  # asserts_env comes from deployment_environment, and the fixed site label matches the
+  # Site's name, the same way the Site CONTAINS Inverter rule does.
+  - type: DESCRIBES
+    startEntityType: Service
+    endEntityType: Site
+    definedBy:
+      source: METRICS
+      pattern: |
+        label_replace(
+          label_replace(
+            Site_Expected_AC_Power_W{job="integrations/solaredge-geolocate"},
+            "asserts_env", "$1", "deployment_environment", "(.*)"
+          ),
+          "site", "solaredge-site", "job", ".*"
+        )
+      startEntityMatchers:
+        name: job
+        env: asserts_env
+      endEntityMatchers:
+        name: site
+        env: asserts_env
+
+  # The collector scrapes each job. prometheus_target_scrape_pool_targets carries
+  # the collector id and the scrape job on one series, which joins the host
+  # cluster to the site services. The node and the alloy process are already
+  # tied to the collector, so this one edge pulls them across too.
+  - type: SCRAPES
+    startEntityType: Collector
+    endEntityType: Service
+    definedBy:
+      source: METRICS
+      pattern: |
+        label_replace(
+          prometheus_target_scrape_pool_targets{
+            job="integrations/alloy",
+            scrape_job=~"integrations/(solaredge|solaredge-geolocate|raspberrypi-node)",
+            deployment_environment!=""
+          },
+          "asserts_env", "$1", "deployment_environment", "(.*)"
+        )
+      startEntityMatchers:
+        name: collector_id
+        env: asserts_env
+      endEntityMatchers:
+        name: scrape_job
+        env: asserts_env
+
+  # The synthetic check requests the exporter's metrics URL. The check's name is
+  # job and instance joined by "__", and the URL's host and port is the exporter
+  # name. The check entity has no environment, so it is matched by name only.
+  - type: PROBES
+    startEntityType: SyntheticCheck
+    endEntityType: Exporter
+    definedBy:
+      source: METRICS
+      pattern: |
+        label_replace(
+          label_replace(
+            label_join(sm_check_info, "check", "__", "job", "instance"),
+            "exporter", "$1", "instance", "https?://([^/]+).*"
+          ),
+          "asserts_env", "home", "job", ".*"
+        )
+      startEntityMatchers:
+        name: check
+      endEntityMatchers:
+        name: exporter
+        env: asserts_env
+
+  # The check's probe label is the node the probe runs on.
+  - type: RUNS_ON
+    startEntityType: SyntheticCheck
+    endEntityType: Node
+    definedBy:
+      source: METRICS
+      pattern: |
+        label_replace(
+          label_join(sm_check_info{probe!=""}, "check", "__", "job", "instance"),
+          "asserts_env", "home", "probe", ".*"
+        )
+      startEntityMatchers:
+        name: check
+      endEntityMatchers:
+        name: probe
+        env: asserts_env

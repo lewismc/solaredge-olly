@@ -1,0 +1,53 @@
+{
+  "uid": "bg48l2kje2bcwb",
+  "title": "SiteFault",
+  "ruleGroup": "solaredge-home-health",
+  "folderUID": "alerting-tprwygwwerdz",
+  "condition": "threshold",
+  "for": "0s",
+  "noDataState": "OK",
+  "execErrState": "Error",
+  "labels": {
+    "asserts_severity": "critical",
+    "asserts_alert_category": "error",
+    "asserts_entity_type": "Site"
+  },
+  "annotations": {
+    "summary": "Site {{ $labels.site }} has an inverter in Fault."
+  },
+  "notification_settings": {
+    "receiver": "grafana-insight-processor",
+    "group_by": ["alertname", "site"],
+    "group_wait": "10s",
+    "group_interval": "30s"
+  },
+  "data": [
+    {
+      "refId": "query",
+      "queryType": "prometheus",
+      "relativeTimeRange": { "from": 660, "to": 60 },
+      "datasourceUid": "grafanacloud-prom",
+      "model": {
+        "refId": "query",
+        "datasource": { "type": "prometheus", "uid": "grafanacloud-prom" },
+        "instant": true,
+        "range": false,
+        "intervalMs": 1000,
+        "maxDataPoints": 43200,
+        "expr": "max by (site, asserts_env, asserts_site) (label_replace(label_replace(label_replace((Status{job=\"integrations/solaredge\", deployment_environment!=\"\"} == bool 7), \"asserts_env\", \"$1\", \"deployment_environment\", \"(.*)\"), \"asserts_site\", \"solaredge\", \"job\", \".*\"), \"site\", \"solaredge-site\", \"job\", \".*\"))"
+      }
+    },
+    {
+      "refId": "threshold",
+      "queryType": "threshold",
+      "relativeTimeRange": { "from": 660, "to": 60 },
+      "datasourceUid": "__expr__",
+      "model": {
+        "refId": "threshold",
+        "type": "threshold",
+        "expression": "query",
+        "conditions": [{ "evaluator": { "type": "gt", "params": [0] } }]
+      }
+    }
+  ]
+}

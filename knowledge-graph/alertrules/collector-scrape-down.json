@@ -1,0 +1,53 @@
+{
+  "uid": "ag48l2jo3u3gga",
+  "title": "CollectorScrapeDown",
+  "ruleGroup": "solaredge-home-health",
+  "folderUID": "alerting-tprwygwwerdz",
+  "condition": "threshold",
+  "for": "0s",
+  "noDataState": "OK",
+  "execErrState": "Error",
+  "labels": {
+    "asserts_severity": "critical",
+    "asserts_alert_category": "error",
+    "asserts_entity_type": "Collector"
+  },
+  "annotations": {
+    "summary": "Collector {{ $labels.collector }} scrape is down."
+  },
+  "notification_settings": {
+    "receiver": "grafana-insight-processor",
+    "group_by": ["alertname", "collector"],
+    "group_wait": "10s",
+    "group_interval": "30s"
+  },
+  "data": [
+    {
+      "refId": "query",
+      "queryType": "prometheus",
+      "relativeTimeRange": { "from": 660, "to": 60 },
+      "datasourceUid": "grafanacloud-prom",
+      "model": {
+        "refId": "query",
+        "datasource": { "type": "prometheus", "uid": "grafanacloud-prom" },
+        "instant": true,
+        "range": false,
+        "intervalMs": 1000,
+        "maxDataPoints": 43200,
+        "expr": "label_replace(label_replace(label_replace((up{job=\"integrations/alloy\", collector_id!=\"\"} == bool 0), \"collector\", \"$1\", \"collector_id\", \"(.*)\"), \"asserts_env\", \"home\", \"job\", \".*\"), \"asserts_site\", \"solaredge\", \"job\", \".*\")"
+      }
+    },
+    {
+      "refId": "threshold",
+      "queryType": "threshold",
+      "relativeTimeRange": { "from": 660, "to": 60 },
+      "datasourceUid": "__expr__",
+      "model": {
+        "refId": "threshold",
+        "type": "threshold",
+        "expression": "query",
+        "conditions": [{ "evaluator": { "type": "gt", "params": [0] } }]
+      }
+    }
+  ]
+}

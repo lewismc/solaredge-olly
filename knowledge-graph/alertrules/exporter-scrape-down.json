@@ -1,0 +1,53 @@
+{
+  "uid": "fg48l2hw0fw1sa",
+  "title": "ExporterScrapeDown",
+  "ruleGroup": "solaredge-home-health",
+  "folderUID": "alerting-tprwygwwerdz",
+  "condition": "threshold",
+  "for": "0s",
+  "noDataState": "OK",
+  "execErrState": "Error",
+  "labels": {
+    "asserts_severity": "critical",
+    "asserts_alert_category": "error",
+    "asserts_entity_type": "Exporter"
+  },
+  "annotations": {
+    "summary": "Exporter {{ $labels.exporter }} scrape is down."
+  },
+  "notification_settings": {
+    "receiver": "grafana-insight-processor",
+    "group_by": ["alertname", "exporter"],
+    "group_wait": "10s",
+    "group_interval": "30s"
+  },
+  "data": [
+    {
+      "refId": "query",
+      "queryType": "prometheus",
+      "relativeTimeRange": { "from": 660, "to": 60 },
+      "datasourceUid": "grafanacloud-prom",
+      "model": {
+        "refId": "query",
+        "datasource": { "type": "prometheus", "uid": "grafanacloud-prom" },
+        "instant": true,
+        "range": false,
+        "intervalMs": 1000,
+        "maxDataPoints": 43200,
+        "expr": "label_replace(label_replace(label_replace((up{job=\"integrations/solaredge\", asserts_env!=\"\"} == bool 0), \"exporter\", \"$1\", \"instance\", \"(.*)\"), \"asserts_site\", \"solaredge\", \"job\", \".*\"), \"asserts_env\", \"$1\", \"asserts_env\", \"(.*)\")"
+      }
+    },
+    {
+      "refId": "threshold",
+      "queryType": "threshold",
+      "relativeTimeRange": { "from": 660, "to": 60 },
+      "datasourceUid": "__expr__",
+      "model": {
+        "refId": "threshold",
+        "type": "threshold",
+        "expression": "query",
+        "conditions": [{ "evaluator": { "type": "gt", "params": [0] } }]
+      }
+    }
+  ]
+}

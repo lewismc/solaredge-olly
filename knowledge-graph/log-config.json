@@ -1,0 +1,23 @@
+{
+  "name": "solaredge-home",
+  "priority": 1000,
+  "defaultConfig": false,
+  "dataSourceUid": "grafanacloud-logs",
+  "match": [
+    {
+      "property": "asserts_entity_type",
+      "op": "=",
+      "values": ["Exporter", "Inverter"]
+    },
+    {
+      "property": "job",
+      "op": "IS NOT NULL",
+      "values": []
+    }
+  ],
+  "entityPropertyToLogLabelMapping": {
+    "job": "job"
+  },
+  "filterBySpanId": false,
+  "filterByTraceId": false
+}
