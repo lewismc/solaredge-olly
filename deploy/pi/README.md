@@ -31,6 +31,15 @@ The exporter binary is the pinned commit `42d4790b78f76a5fae9e931cf78a76dbda0ccb
 
 `solaredge-update.timer` runs [`update.sh`](update.sh) once a day. The script downloads the latest public GitHub release, checks `SHA256SUMS`, points `/opt/solaredge/bin/alloy` and `/opt/solaredge/bin/solaredge-exporter` at `releases/<tag>/`, and restarts Alloy. The exporter restarts only when its binary changed. For five minutes the script requires Alloy to stay active, stay ready on `127.0.0.1:12345`, stay under 220 MB RSS, and log no panic. A failure puts the previous release back. `/etc/solaredge/solaredge.env` is not part of a release. The systemd units in this directory are not copied over the live units, so a release does not switch Alloy off `/etc/alloy/config.alloy`.
 
+`SHA256SUMS` comes from the same release, so it catches a corrupt download and not a forged release. Each release built on `main` also has a GitHub build-provenance attestation for the three payloads. The Pi does not check it: `gh` and cosign are not installed, and either one is a large binary for a 427 MB host. Check a release from another machine before trusting it:
+
+```bash
+gh release download <tag> -R lewismc/solaredge-olly -D /tmp/rel
+gh attestation verify /tmp/rel/alloy-linux-armv6 -R lewismc/solaredge-olly
+gh attestation verify /tmp/rel/solaredge-exporter-linux-armv6 -R lewismc/solaredge-olly
+gh attestation verify /tmp/rel/solaredge-bundle.tar.gz -R lewismc/solaredge-olly
+```
+
 The memory controller has to be on the kernel command line (`cgroup_enable=memory cgroup_memory=1` in `/boot/firmware/cmdline.txt`) before `MemoryMax` applies. Confirm `memory` is listed in `/sys/fs/cgroup/cgroup.controllers`.
 
 One Modbus TCP client can hold the inverter. Stop and disable `sunspec-sim` before setting `INVERTER_ADDRESS` to the inverter, and do not point the exporter at the inverter while another logger is connected.

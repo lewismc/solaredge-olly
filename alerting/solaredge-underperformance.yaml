@@ -1,0 +1,54 @@
+# Grafana-managed rule. service_name routes it to the Slack contact point in notifications/.
+# Set grafana.app/folder (label and annotation) to your folder UID before pushing.
+# Actual AC power over the Open-Meteo expected power, only while GTI is above 200 W/m2.
+# The expected-power model ignores shading, soiling, and temperature, so a normal clear
+# day sits near 0.6 and the 7-day 10th percentile was about 0.27. Below 0.25 for an hour
+# is well under a normal day. The query is empty at night and under low irradiance,
+# so NoData is OK.
+apiVersion: rules.alerting.grafana.app/v0alpha1
+kind: AlertRule
+metadata:
+  name: solaredge-underperformance
+  labels:
+    grafana.app/folder: YOUR_FOLDER_UID
+  annotations:
+    grafana.app/folder: YOUR_FOLDER_UID
+spec:
+  title: SolarEdge underperformance
+  labels:
+    service_name: solaredge-exporter
+  for: 1h0m0s
+  noDataState: Ok
+  execErrState: Error
+  trigger:
+    interval: 1m0s
+  annotations:
+    summary: SolarEdge AC power has been under 25% of the Open-Meteo expected power for an hour while irradiance was above 200 W/m2.
+  expressions:
+    PowerRatio:
+      datasourceUID: grafanacloud-prom
+      queryType: instant
+      relativeTimeRange:
+        from: 10m0s
+        to: 0s
+      model:
+        expr: sum(AC_Power{job="integrations/solaredge"} * (10 ^ AC_Power_SF{job="integrations/solaredge"})) / on() max(Site_Expected_AC_Power_W{job="integrations/solaredge-geolocate"}) and on() (Site_Irradiance_GTI_Wm2{job="integrations/solaredge-geolocate"} > 200)
+        instant: true
+        intervalMs: 1000
+        maxDataPoints: 43200
+        queryType: instant
+        refId: PowerRatio
+    BelowThreshold:
+      source: true
+      model:
+        type: threshold
+        expression: PowerRatio
+        refId: BelowThreshold
+        intervalMs: 1000
+        maxDataPoints: 43200
+        conditions:
+          - evaluator:
+              type: lt
+              params:
+                - 0.25
+            type: lt

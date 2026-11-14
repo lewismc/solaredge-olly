@@ -1,6 +1,6 @@
 # solaredge-olly
 
-Docker Compose collector for SolarEdge inverters. A Prometheus exporter polls each inverter over Modbus TCP / SunSpec. Grafana Alloy scrapes that exporter and remote-writes the samples to Grafana Cloud. The same Alloy process tails the exporter's JSON log file and pushes it to Grafana Cloud Logs.
+Collector for SolarEdge inverters. The live collector runs on a Raspberry Pi under systemd, described in [Raspberry Pi](#raspberry-pi). Docker Compose runs the same services on a Mac or a Linux host for simulator and development runs. A Prometheus exporter polls each inverter over Modbus TCP / SunSpec. Grafana Alloy scrapes that exporter and remote-writes the samples to Grafana Cloud. The same Alloy process tails the exporter's JSON log file and pushes it to Grafana Cloud Logs.
 
 ```text
 inverter --Modbus TCP--> solaredge-exporter --scrape :2112--> Alloy --remote_write--> Grafana Cloud Metrics
@@ -12,7 +12,7 @@ The dashboard is [`dashboards/solaredge.json`](dashboards/solaredge.json). Alert
 
 ## What runs
 
-`docker compose up` starts four services on a bridge network:
+The Pi runs these services as systemd units. For a simulator or development run, `docker compose up` starts the same four services on a bridge network. Do not run Compose against the live inverter while the Pi is running: the inverter accepts one Modbus client, and two collectors with `collector_id=solaredge` would fight over the Fleet Management pipeline.
 
 | Service | Role |
 | :--- | :--- |
@@ -136,12 +136,28 @@ The Docker host needs outbound HTTPS to `ipinfo.io` and `api.open-meteo.com`. Op
 
 ## Alerts
 
-[`alerting/`](alerting/) holds four Grafana-managed rules, one resource per file (`gcx resources push` reads the first document in a file). A scrape with `up == 0` for `job="integrations/solaredge"`, Modbus errors at `level="error"` on `{service_name="solaredge-exporter", job="integrations/solaredge"}`, `Status == 7` (Fault), and `Modbus_Read_OK == 0` for five minutes. `Status == 2` (Sleeping) is healthy and is not a rule. `up == 0` is the scrape of port `2112`. The poll-failure rule is the gauge, and a missing gauge is NoData. No contact point is committed. Each rule evaluates every minute. The API rejects `grafana.com/group` on create, and a rule sequence has to contain a recording rule, so these rules are not placed in a shared evaluation group.
+[`alerting/`](alerting/) holds five Grafana-managed rules, one resource per file (`gcx resources push` reads the first document in a file). A scrape with `up == 0` for `job="integrations/solaredge"`, Modbus errors at `level="error"` on `{service_name="solaredge-exporter", job="integrations/solaredge"}`, `Status == 7` (Fault), `Modbus_Read_OK == 0` for five minutes, and underperformance. `Status == 2` (Sleeping) is healthy and is not a rule. `up == 0` is the scrape of port `2112`. The poll-failure rule is the gauge, and a missing gauge is NoData.
+
+Underperformance is actual AC power over `Site_Expected_AC_Power_W`, evaluated only while `Site_Irradiance_GTI_Wm2` is above 200. It fires below 0.25 for an hour. The expected-power model is optimistic: over the first week the ratio averaged about 0.58 under that irradiance, and its 10th percentile was about 0.27. The query is empty at night, so NoData is OK.
+
+Every rule carries `service_name=solaredge-exporter`, the label the notification route matches. See [Notifications](#notifications). Each rule evaluates every minute. The API rejects `grafana.com/group` on create, and a rule sequence has to contain a recording rule, so these rules are not placed in a shared evaluation group.
 
 The queries use the Grafana Cloud datasource UIDs `grafanacloud-prom` and `grafanacloud-logs`. Set `grafana.app/folder` to your folder UID before pushing (`gcx resources get folders`).
 
 ```bash
 gcx resources push alertrules -p alerting
+```
+
+## Notifications
+
+[`notifications/`](notifications/) routes every SolarEdge alert to Slack. [`slack-contact-point.yaml`](notifications/slack-contact-point.yaml) is the contact point `solaredge-slack`, an incoming webhook bound to the private channel `#lewismc-solaredge-olly`. The webhook URL is a secret. It lives in `.env` as `SLACK_WEBHOOK_URL` and is substituted at create time, so the committed file holds only the placeholder.
+
+[`policy-tree.yaml`](notifications/policy-tree.yaml) is the whole notification policy tree. The default route stays `grafana-default-email`. One child route matches `service_name=solaredge-exporter` and sends to `solaredge-slack`. The five rules and both SLOs' burn-rate alerts carry that label, so no rule names a contact point. `set` replaces the tree, so merge any other routes on the stack into the file first.
+
+```bash
+set -a; . ./.env; set +a
+envsubst '$SLACK_WEBHOOK_URL' < notifications/slack-contact-point.yaml | gcx alert contact-points create -f -
+gcx alert notification-policies set -f notifications/policy-tree.yaml
 ```
 
 ## Fleet Management
@@ -184,7 +200,7 @@ Alloy's own metrics reach Grafana Cloud from two pipelines. The generated `self_
 
 [`synthetic/exporter-http.yaml`](synthetic/exporter-http.yaml) is a MultiHTTP check, job `solaredge-exporter-metrics`, every 60 seconds, timeout 15 seconds, probe `solaredge`. Its assertions require HTTP 200 and a body that contains `SunSpec_DID{`, `Status{`, `AC_Power{`, and `AC_Power_SF{`. `AC_Power{` does not match `AC_Power_SF`. It does not read phase B, phase C, a meter, `/health`, or `Modbus_Read_OK`. A dead Modbus session after the first good poll still passes, because those series stay on the exporter until the process restarts. The request URL is `http://127.0.0.1:2112/metrics` because the API rejects the single-label hostname on a MultiHTTP request; the check target stays `http://solaredge-exporter:2112/metrics`. The check label `service_name=solaredge-exporter` is the same value as the exporter log stream.
 
-The agent image is pinned to `v0.68.0`. Its command includes `--blocked-nets=0.0.0.0/32`, which turns off the agent's default `10.0.0.0/8` denylist so the probe can open the Compose address. No ports are published. `alertSensitivity` is `none`. No contact point is committed.
+The agent image is pinned to `v0.68.0`. Its command includes `--blocked-nets=0.0.0.0/32`, which turns off the agent's default `10.0.0.0/8` denylist so the probe can open the Compose address. No ports are published. `alertSensitivity` is `none`, so the check raises no alerts of its own.
 
 ```bash
 gcx synthetic-monitoring checks create -f synthetic/exporter-http.yaml
@@ -192,7 +208,7 @@ gcx synthetic-monitoring checks create -f synthetic/exporter-http.yaml
 
 ## SLOs
 
-[`slo/`](slo/) holds two Grafana Cloud SLOs, objective 0.99 over 28 days. `metadata.name` is empty so the file does not pin one stack's UUID. Both set `spec.labels` to `service_name=solaredge-exporter`. The SLO app reads that key for the service column and the insights "Missing service label" count. A label named `service` does not count. Fast-burn and slow-burn alerts each carry an `assistantInvestigation` enrichment, so a firing burn alert starts an Assistant investigation. `gcx resources push` treats that empty name as a single object, so push one file at a time. No contact point is committed. There is no energy SLO.
+[`slo/`](slo/) holds two Grafana Cloud SLOs, objective 0.99 over 28 days. `metadata.name` is empty so the file does not pin one stack's UUID. Both set `spec.labels` to `service_name=solaredge-exporter`. The SLO app reads that key for the service column and the insights "Missing service label" count. A label named `service` does not count. Fast-burn and slow-burn alerts each carry an `assistantInvestigation` enrichment, so a firing burn alert starts an Assistant investigation. `gcx resources push` treats that empty name as a single object, so push one file at a time. The burn-rate alerts inherit `service_name=solaredge-exporter` and route to Slack. There is no energy SLO.
 
 `Modbus_Read_OK` is the poll gauge from [`exporter/modbus-read-ok.patch`](exporter/modbus-read-ok.patch). It is 1 after a poll publishes the inverter model, and it stays 1 between polls. It goes to 0 only when a connect, a read, or a parse fails, and the next successful poll sets it back to 1. A meter error later in the poll does not clear it. An earlier revision reset the gauge to 0 at the start of every poll, so a scrape that landed during a good read recorded a failure. The poll-success SLO history therefore starts over at this change, and its earlier values are not comparable. `Inverter_Info` stays the once-at-startup series. The keep-list in [`module/metrics.alloy`](module/metrics.alloy) includes the gauge.
 
@@ -219,7 +235,9 @@ Each chapter gets its own directory when it is implemented.
 2. **Fleet Management** in [`fleet/solaredge.alloy`](fleet/solaredge.alloy). Implemented. [`alloy/config.alloy`](alloy/config.alloy) is the `remotecfg` bootstrap.
 3. **Synthetic monitoring** in [`synthetic/`](synthetic/). Implemented. The private probe runs on the Pi. The MultiHTTP check does not prove the inverter answered the latest poll.
 4. **SLOs** in [`slo/`](slo/). Implemented. Poll success, and fault-free among successful polls. No energy SLO.
-5. **Geolocation and expected yield** in [`geolocate/`](geolocate/). Implemented. No alert or SLO on expected yield yet.
+5. **Geolocation and expected yield** in [`geolocate/`](geolocate/). Implemented. The underperformance rule alerts on it. No SLO on expected yield.
+6. **Raspberry Pi** in [`deploy/pi/`](deploy/pi/). Implemented. systemd units, armv6 releases with build provenance, and a daily updater with rollback.
+7. **Notifications** in [`notifications/`](notifications/). Implemented. Slack contact point and a route on `service_name`.
 
 ## Troubleshooting
 

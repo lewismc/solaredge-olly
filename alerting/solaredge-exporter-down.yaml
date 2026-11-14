@@ -1,4 +1,4 @@
-# Grafana-managed rule. No contact point is committed; attach your own receiver.
+# Grafana-managed rule. service_name routes it to the Slack contact point in notifications/.
 # Set grafana.app/folder (label and annotation) to your folder UID before pushing.
 # Prometheus UID grafanacloud-prom and Loki UID grafanacloud-logs are the Grafana
 # Cloud defaults. Replace them if your stack uses different UIDs.
@@ -14,6 +14,8 @@ metadata:
     grafana.app/folder: YOUR_FOLDER_UID
 spec:
   title: SolarEdge exporter down
+  labels:
+    service_name: solaredge-exporter
   for: 5m0s
   noDataState: Alerting
   execErrState: Error
@@ -25,7 +27,7 @@ spec:
   # A filtered `up == 0` query is empty while the exporter is up, and
   # noDataState Alerting would fire on that empty result.
   expressions:
-    A:
+    ScrapeUp:
       datasourceUID: grafanacloud-prom
       queryType: instant
       relativeTimeRange:
@@ -37,13 +39,13 @@ spec:
         intervalMs: 1000
         maxDataPoints: 43200
         queryType: instant
-        refId: A
-    B:
+        refId: ScrapeUp
+    ScrapeDown:
       source: true
       model:
         type: threshold
-        expression: A
-        refId: B
+        expression: ScrapeUp
+        refId: ScrapeDown
         intervalMs: 1000
         maxDataPoints: 43200
         conditions:

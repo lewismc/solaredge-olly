@@ -1,0 +1,18 @@
+# The whole notification policy tree for the stack. `gcx alert notification-policies set`
+# replaces the tree, so this file keeps the stack's existing default route and adds the
+# SolarEdge route. Merge any other routes on the stack into this file before setting it.
+# Every SolarEdge rule and both SLOs' burn-rate alerts carry service_name=solaredge-exporter.
+group_by:
+  - grafana_folder
+  - alertname
+receiver: grafana-default-email
+routes:
+  - receiver: solaredge-slack
+    object_matchers:
+      - ["service_name", "=", "solaredge-exporter"]
+    group_by:
+      - alertname
+      - grafana_slo_uuid
+    group_wait: 30s
+    group_interval: 5m
+    repeat_interval: 12h

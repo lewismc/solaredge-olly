@@ -1,3 +1,6 @@
+# Simulator and development runs on a Mac or Linux host. The live collector runs on
+# the Raspberry Pi under systemd (deploy/pi/). Do not point this at the live inverter
+# while the Pi is running: one Modbus client per inverter, one collector_id=solaredge.
 services:
   sunspec-sim:
     profiles: ["sim"]

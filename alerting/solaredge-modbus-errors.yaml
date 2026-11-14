@@ -1,4 +1,4 @@
-# Grafana-managed rule. No contact point is committed; attach your own receiver.
+# Grafana-managed rule. service_name routes it to the Slack contact point in notifications/.
 # Set grafana.app/folder (label and annotation) to your folder UID before pushing.
 apiVersion: rules.alerting.grafana.app/v0alpha1
 kind: AlertRule
@@ -10,6 +10,8 @@ metadata:
     grafana.app/folder: YOUR_FOLDER_UID
 spec:
   title: SolarEdge Modbus errors
+  labels:
+    service_name: solaredge-exporter
   for: 5m0s
   noDataState: Ok
   execErrState: Error
@@ -18,7 +20,7 @@ spec:
   annotations:
     summary: SolarEdge exporter is logging Modbus errors.
   expressions:
-    A:
+    ErrorLogs:
       datasourceUID: grafanacloud-logs
       queryType: instant
       relativeTimeRange:
@@ -29,13 +31,13 @@ spec:
         queryType: instant
         intervalMs: 1000
         maxDataPoints: 43200
-        refId: A
-    B:
+        refId: ErrorLogs
+    HasErrors:
       source: true
       model:
         type: threshold
-        expression: A
-        refId: B
+        expression: ErrorLogs
+        refId: HasErrors
         intervalMs: 1000
         maxDataPoints: 43200
         conditions:

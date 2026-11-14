@@ -1,6 +1,5 @@
 # Private-probe MultiHTTP check. Probe names, not numeric ids.
 # alertSensitivity none: this stack rejects legacy SM alert thresholds.
-# No contact point is committed.
 # service_name matches the exporter log stream. The knowledge graph is not
 # enabled on this stack, so there is no namespace to copy.
 #

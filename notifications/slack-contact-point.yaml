@@ -1,0 +1,19 @@
+# Slack contact point. The webhook URL is a secret and is filled from SLACK_WEBHOOK_URL
+# in .env at create time. Do not commit the substituted file.
+# The incoming webhook is bound to the private channel #lewismc-solaredge-olly.
+#
+# Slack mrkdwn bolds with a single asterisk, so the header uses *...* and not **...**.
+# Each alert lists its named queries from .Values (for example PowerRatio = 0.12), so
+# the message never shows the A/B ref ids or an empty "[no value]" placeholder.
+name: solaredge-slack
+type: slack
+disableResolveMessage: false
+settings:
+  url: ${SLACK_WEBHOOK_URL}
+  recipient: "#lewismc-solaredge-olly"
+  title: '{{ template "default.title" . }}'
+  text: |-
+    {{ range .Alerts }}*{{ .Status | toUpper }}: {{ .Labels.alertname }}*
+    {{ .Annotations.summary }}
+    {{ range $query, $value := .Values }}    {{ $query }} = {{ $value }}
+    {{ end }}{{ end }}

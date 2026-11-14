@@ -1,4 +1,4 @@
-# Grafana-managed rule. No contact point is committed; attach your own receiver.
+# Grafana-managed rule. service_name routes it to the Slack contact point in notifications/.
 # Set grafana.app/folder (label and annotation) to your folder UID before pushing.
 # This is the Modbus poll, not the Prometheus scrape. up == 0 remains the :2112 scrape.
 # The query keeps the gauge. Threshold < 1 is Modbus_Read_OK == 0.
@@ -13,6 +13,8 @@ metadata:
     grafana.app/folder: YOUR_FOLDER_UID
 spec:
   title: SolarEdge poll failure
+  labels:
+    service_name: solaredge-exporter
   for: 5m0s
   noDataState: NoData
   execErrState: Error
@@ -21,7 +23,7 @@ spec:
   annotations:
     summary: SolarEdge Modbus poll failed (Modbus_Read_OK == 0). A missing series is NoData; up == 0 covers a down scrape.
   expressions:
-    A:
+    ModbusReadOK:
       datasourceUID: grafanacloud-prom
       queryType: instant
       relativeTimeRange:
@@ -33,13 +35,13 @@ spec:
         intervalMs: 1000
         maxDataPoints: 43200
         queryType: instant
-        refId: A
-    B:
+        refId: ModbusReadOK
+    PollFailed:
       source: true
       model:
         type: threshold
-        expression: A
-        refId: B
+        expression: ModbusReadOK
+        refId: PollFailed
         intervalMs: 1000
         maxDataPoints: 43200
         conditions:

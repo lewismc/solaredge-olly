@@ -1,4 +1,4 @@
-# Grafana-managed rule. No contact point is committed; attach your own receiver.
+# Grafana-managed rule. service_name routes it to the Slack contact point in notifications/.
 # Set grafana.app/folder (label and annotation) to your folder UID before pushing.
 # Sleeping (Status == 2) keeps the series and does not match == 7.
 apiVersion: rules.alerting.grafana.app/v0alpha1
@@ -11,6 +11,8 @@ metadata:
     grafana.app/folder: YOUR_FOLDER_UID
 spec:
   title: SolarEdge inverter fault
+  labels:
+    service_name: solaredge-exporter
   for: 5m0s
   noDataState: Ok
   execErrState: Error
@@ -19,7 +21,7 @@ spec:
   annotations:
     summary: SolarEdge inverter Status is Fault (7). Sleeping (2) is healthy.
   expressions:
-    A:
+    InverterStatus:
       datasourceUID: grafanacloud-prom
       queryType: instant
       relativeTimeRange:
@@ -31,20 +33,20 @@ spec:
         intervalMs: 1000
         maxDataPoints: 43200
         queryType: instant
-        refId: A
-    B:
+        refId: InverterStatus
+    IsFault:
       model:
         type: math
-        expression: $A == 7
-        refId: B
+        expression: $InverterStatus == 7
+        refId: IsFault
         intervalMs: 1000
         maxDataPoints: 43200
-    C:
+    FaultFired:
       source: true
       model:
         type: threshold
-        expression: B
-        refId: C
+        expression: IsFault
+        refId: FaultFired
         intervalMs: 1000
         maxDataPoints: 43200
         conditions:
