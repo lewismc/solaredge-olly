@@ -17,5 +17,8 @@ The reading order is the order the work was built. Edit these pages in the repos
 | 9 | [Synthetic Monitoring](https://github.com/lewismc/solaredge-olly/wiki/Synthetic-Monitoring) | Synthetic Monitoring |
 | 10 | [SLOs](https://github.com/lewismc/solaredge-olly/wiki/SLOs) | SLOs, Grafana Assistant |
 | 11 | [Raspberry Pi runtime](https://github.com/lewismc/solaredge-olly/wiki/Raspberry-Pi-runtime) | The collector host |
+| 12 | [Host metrics](https://github.com/lewismc/solaredge-olly/wiki/Host-metrics) | Integrations, node_exporter |
+| 13 | [Recording rules](https://github.com/lewismc/solaredge-olly/wiki/Recording-rules) | Recording rules |
+| 14 | [Knowledge Graph](https://github.com/lewismc/solaredge-olly/wiki/Knowledge-Graph) | Knowledge Graph |
 
 Each page has three parts: what the product is, how this stack uses it, and what to reuse on a customer system.

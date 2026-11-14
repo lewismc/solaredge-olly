@@ -13,8 +13,15 @@ metadata:
     grafana.app/folder: YOUR_FOLDER_UID
 spec:
   title: SolarEdge unit OOM kill
+  # The series is per unit. The assertion is on the Collector, which is one host.
   labels:
     service_name: solaredge-exporter
+    asserts_env: home
+    asserts_site: solaredge
+    asserts_entity_type: Collector
+    asserts_alert_category: error
+    asserts_severity: critical
+    collector: solaredge
   for: 0s
   noDataState: Ok
   execErrState: Error

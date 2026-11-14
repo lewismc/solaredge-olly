@@ -22,6 +22,19 @@ The API rejects `grafana.com/group` on create, and a rule sequence has to contai
 
 The two unit rules read the textfile series described on [Host metrics](https://github.com/lewismc/solaredge-olly/wiki/Host-metrics). The Raspberry Pi integration's own alerts (temperature, filesystem, host memory, failed units) are installed with the integration and are not in this directory.
 
+Four more rules live in the `knowledge-graph` folder, group `solaredge-home-health`, and are not in [alerting/](https://github.com/lewismc/solaredge-olly/tree/main/alerting). They are the [Knowledge Graph](https://github.com/lewismc/solaredge-olly/wiki/Knowledge-Graph) health rules. Each one notifies `grafana-insight-processor`, so it colors an entity and does not post to Slack. The files are in [knowledge-graph/alertrules/](https://github.com/lewismc/solaredge-olly/tree/main/knowledge-graph/alertrules).
+
+| Rule | Fires when | Entity | No data |
+| :--- | :--- | :--- | :--- |
+| ExporterScrapeDown | `up{job="integrations/solaredge"}` is 0 | Exporter | OK |
+| InverterFault | `Status` is 7 | Inverter | OK |
+| SiteFault | the same fault, labeled as the site | Site | OK |
+| CollectorScrapeDown | `up{job="integrations/alloy"}` is 0 | Collector | OK |
+
+`InverterFault` matches only 7, so `Status == 2` (Sleeping) leaves the Inverter healthy. These expressions use `== bool` and return 0 while healthy. The Slack inverter-fault rule is the same condition, held for 5 minutes, and it pages. The Knowledge Graph rule is not held, and it only colors the graph.
+
+The seven Slack rules also carry `asserts_env`, `asserts_site`, `asserts_entity_type`, `asserts_alert_category`, and `asserts_severity`. `service_name=solaredge-exporter` is unchanged, so they still page Slack. The Knowledge Graph watcher copies a firing alert from this folder onto the matching entity. Exporter down and inverter fault therefore show twice when they fire: the health rule immediately, and the Slack rule after its hold. The inverter name stays the series label. The other rules name their one entity in the file, because the query drops labels or the alert fires on no data.
+
 `Status == 2` (Sleeping) is healthy and is not a rule. The exporter-down query keeps the `up` series and thresholds it. A query of `up == 0` is empty while the exporter is up, and `noDataState: Alerting` would fire on that empty result. The poll-failure rule is the same shape on the gauge. A missing gauge is NoData, which is a different failure from a gauge of 0.
 
 The fault rule is three queries: `InverterStatus` reads `Status`, `IsFault` is `$InverterStatus == 7`, and `FaultFired` thresholds that above 0. The names are the ref ids. Slack prints them, so a ref id of `A` would show up as `A = 0`.

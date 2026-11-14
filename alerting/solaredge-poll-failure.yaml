@@ -13,8 +13,15 @@ metadata:
     grafana.app/folder: YOUR_FOLDER_UID
 spec:
   title: SolarEdge poll failure
+  # NoData has no series labels, so the exporter name is set here. One scrape instance.
   labels:
     service_name: solaredge-exporter
+    asserts_env: home
+    asserts_site: solaredge
+    asserts_entity_type: Exporter
+    asserts_alert_category: failure
+    asserts_severity: critical
+    exporter: solaredge-exporter:2112
   for: 5m0s
   noDataState: NoData
   execErrState: Error

@@ -11,8 +11,14 @@ metadata:
     grafana.app/folder: YOUR_FOLDER_UID
 spec:
   title: SolarEdge inverter fault
+  # The inverter name stays the series label, so the address is not written here.
   labels:
     service_name: solaredge-exporter
+    asserts_env: home
+    asserts_site: solaredge
+    asserts_entity_type: Inverter
+    asserts_alert_category: error
+    asserts_severity: critical
   for: 5m0s
   noDataState: Ok
   execErrState: Error

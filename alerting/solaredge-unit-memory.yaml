@@ -15,8 +15,15 @@ metadata:
     grafana.app/folder: YOUR_FOLDER_UID
 spec:
   title: SolarEdge unit memory near MemoryMax
+  # The series is per unit. The assertion is on the Collector, which is one host.
   labels:
     service_name: solaredge-exporter
+    asserts_env: home
+    asserts_site: solaredge
+    asserts_entity_type: Collector
+    asserts_alert_category: saturation
+    asserts_severity: warning
+    collector: solaredge
   for: 15m0s
   noDataState: Ok
   execErrState: Error

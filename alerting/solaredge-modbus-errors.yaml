@@ -10,8 +10,15 @@ metadata:
     grafana.app/folder: YOUR_FOLDER_UID
 spec:
   title: SolarEdge Modbus errors
+  # sum() drops the stream labels, so the exporter name is set here.
   labels:
     service_name: solaredge-exporter
+    asserts_env: home
+    asserts_site: solaredge
+    asserts_entity_type: Exporter
+    asserts_alert_category: error
+    asserts_severity: warning
+    exporter: solaredge-exporter:2112
   for: 5m0s
   noDataState: Ok
   execErrState: Error

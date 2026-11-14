@@ -11,3 +11,6 @@
 9. [Synthetic Monitoring](Synthetic-Monitoring)
 10. [SLOs](SLOs)
 11. [Raspberry Pi runtime](Raspberry-Pi-runtime)
+12. [Host metrics](Host-metrics)
+13. [Recording rules](Recording-rules)
+14. [Knowledge Graph](Knowledge-Graph)

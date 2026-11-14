@@ -15,8 +15,15 @@ metadata:
     grafana.app/folder: YOUR_FOLDER_UID
 spec:
   title: SolarEdge underperformance
+  # The ratio query drops labels, so the site name is set here.
   labels:
     service_name: solaredge-exporter
+    asserts_env: home
+    asserts_site: solaredge
+    asserts_entity_type: Site
+    asserts_alert_category: saturation
+    asserts_severity: warning
+    site: solaredge-site
   for: 1h0m0s
   noDataState: Ok
   execErrState: Error

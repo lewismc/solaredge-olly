@@ -14,8 +14,16 @@ metadata:
     grafana.app/folder: YOUR_FOLDER_UID
 spec:
   title: SolarEdge exporter down
+  # asserts_* lets the Knowledge Graph watcher color the Exporter. service_name
+  # still routes the page to Slack. The exporter label is this stack's one scrape instance.
   labels:
     service_name: solaredge-exporter
+    asserts_env: home
+    asserts_site: solaredge
+    asserts_entity_type: Exporter
+    asserts_alert_category: error
+    asserts_severity: critical
+    exporter: solaredge-exporter:2112
   for: 5m0s
   noDataState: Alerting
   execErrState: Error
