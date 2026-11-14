@@ -26,6 +26,7 @@ The long-form notes live in the [wiki](https://github.com/lewismc/solaredge-olly
 | 12 | [Host metrics](https://github.com/lewismc/solaredge-olly/wiki/Host-metrics) | Integrations, node_exporter |
 | 13 | [Recording rules](https://github.com/lewismc/solaredge-olly/wiki/Recording-rules) | Recording rules |
 | 14 | [Knowledge Graph](https://github.com/lewismc/solaredge-olly/wiki/Knowledge-Graph) | Knowledge Graph |
+| 15 | [Alloy memory](https://github.com/lewismc/solaredge-olly/wiki/Alloy-memory) | Alloy, self-monitoring |
 
 ## Run
 

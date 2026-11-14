@@ -26,6 +26,6 @@ spec:
         from: 10m0s
         to: 0s
       model:
-        expr: sum by (job, inverter, service_namespace, deployment_environment) (AC_Power{job="integrations/solaredge"} * 10 ^ AC_Power_SF{job="integrations/solaredge"})
+        expr: sum by (job, inverter, service_namespace, deployment_environment, service_name, service_instance_id) (AC_Power{job="integrations/solaredge"} * 10 ^ AC_Power_SF{job="integrations/solaredge"})
         instant: true
         refId: Watts

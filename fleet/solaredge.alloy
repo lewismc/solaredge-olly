@@ -7,9 +7,45 @@ import.file "solaredge_module" {
 	filename = "/etc/alloy/module/metrics.alloy"
 }
 
-// Every metric this pipeline ships carries the same namespace and environment.
-// The Knowledge Graph maps deployment_environment to its env scope. The series
+// Every metric this pipeline ships carries the same OpenTelemetry resource
+// labels, with dots turned into underscores. service_name is one value per
+// scrape job. The regexes are anchored so integrations/solaredge does not
+// also match integrations/solaredge-geolocate. service_instance_id is the
+// host. The Knowledge Graph maps deployment_environment to its env scope,
+// so that key stays, rather than deployment_environment_name. The series
 // from the generated self_monitoring_metrics pipeline do not pass through here.
+prometheus.relabel "service_name" {
+	forward_to = [prometheus.relabel.common.receiver]
+
+	rule {
+		source_labels = ["job"]
+		regex         = "^integrations/solaredge$"
+		target_label  = "service_name"
+		replacement   = "solaredge-exporter"
+	}
+
+	rule {
+		source_labels = ["job"]
+		regex         = "^integrations/solaredge-geolocate$"
+		target_label  = "service_name"
+		replacement   = "solaredge-geolocate"
+	}
+
+	rule {
+		source_labels = ["job"]
+		regex         = "^integrations/raspberrypi-node$"
+		target_label  = "service_name"
+		replacement   = "node-exporter"
+	}
+
+	rule {
+		source_labels = ["job"]
+		regex         = "^integrations/alloy$"
+		target_label  = "service_name"
+		replacement   = "alloy"
+	}
+}
+
 prometheus.relabel "common" {
 	forward_to = [prometheus.remote_write.cloud.receiver]
 
@@ -21,6 +57,11 @@ prometheus.relabel "common" {
 	rule {
 		target_label = "deployment_environment"
 		replacement  = "home"
+	}
+
+	rule {
+		target_label = "service_instance_id"
+		replacement  = constants.hostname
 	}
 }
 
@@ -41,7 +82,7 @@ solaredge_module.local "exporter" {
 
 solaredge_module.scrape "inverter" {
 	targets    = solaredge_module.local.exporter.output
-	forward_to = [prometheus.relabel.common.receiver]
+	forward_to = [prometheus.relabel.service_name.receiver]
 }
 
 // Site location and expected yield from solaredge-geolocate. A separate job, so
@@ -54,7 +95,7 @@ solaredge_module.scrape "geolocate" {
 	targets      = solaredge_module.local.geolocate.output
 	job_label    = "integrations/solaredge-geolocate"
 	keep_metrics = "(up|Site_.+)"
-	forward_to   = [prometheus.relabel.common.receiver]
+	forward_to   = [prometheus.relabel.service_name.receiver]
 }
 
 // Alloy's own metrics, every family /metrics exposes. The generated
@@ -92,7 +133,7 @@ prometheus.scrape "alloy" {
 }
 
 prometheus.relabel "alloy" {
-	forward_to = [prometheus.relabel.common.receiver]
+	forward_to = [prometheus.relabel.service_name.receiver]
 
 	rule {
 		source_labels = ["__name__"]
@@ -118,7 +159,7 @@ prometheus.scrape "node" {
 }
 
 prometheus.relabel "node" {
-	forward_to = [prometheus.relabel.common.receiver]
+	forward_to = [prometheus.relabel.service_name.receiver]
 
 	rule {
 		source_labels = ["__name__"]
@@ -137,10 +178,11 @@ prometheus.relabel "node" {
 // a byte offset, so a restart continues after the last byte. The Docker log
 // API cursor is only a unix second and is keyed by the label set, so a restart
 // or a label change ships lines that were already sent.
-// Stream labels are service_name and job, plus the static service_namespace and
-// deployment_environment every metric carries. job matches the scrape job, so a
-// metric and its logs share a selector. The inverter address stays in the
-// line body; it moves with the DHCP lease.
+// Stream labels are service_name and job, plus the same resource labels the
+// metrics carry: service_namespace, deployment_environment, and
+// service_instance_id. job matches the scrape job, so a metric and its logs
+// share a selector. The inverter address stays in the line body; it moves
+// with the DHCP lease.
 
 local.file_match "exporter" {
 	path_targets = [{
@@ -164,6 +206,7 @@ loki.process "exporter" {
 		values = {
 			service_namespace      = "solaredge",
 			deployment_environment = "home",
+			service_instance_id    = constants.hostname,
 		}
 	}
 

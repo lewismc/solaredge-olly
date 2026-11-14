@@ -8,7 +8,7 @@
 
 The exporter writes JSON lines to a file. Alloy tails that file. A healthy process logs startup once, then only Modbus errors and reconnects. Debug stays off: it writes a line every 5 seconds. Alloy remembers the byte offset, so a restart does not send the same lines again.
 
-The stream labels are `service_name="solaredge-exporter"` and `job="integrations/solaredge"`. `job` matches the scrape, so a metrics alert and a log query name the same thing. The inverter address is in the line body, not a label.
+The exporter stream carries `service_name="solaredge-exporter"`, `job="integrations/solaredge"`, `service_namespace="solaredge"`, `deployment_environment="home"`, and `service_instance_id` set to the host name. Those four resource labels are the same ones on the metrics, with the OpenTelemetry dots replaced by underscores. `job` stays the integration name, so a metrics alert and a log query name the same thing. `deployment_environment` stays that key because the Knowledge Graph maps it. The inverter address is in the line body, not a label.
 
 ```logql
 {service_name="solaredge-exporter", job="integrations/solaredge"}
@@ -24,7 +24,7 @@ A failed Modbus read keeps the old message text and adds body fields. Read failu
 
 Logs credentials are a different URL and instance id from metrics. `GRAFANA_CLOUD_LOKI_URL` ends in `/loki/api/v1/push`. `GRAFANA_CLOUD_LOKI_USERNAME` is the Loki instance id. The token needs `logs:write` and can be the same token as metrics when the policy has both scopes.
 
-Alloy's own logs are a different stream, `{job="integrations/alloy", collector_id="solaredge"}`. They are described on [Fleet Management](https://github.com/lewismc/solaredge-olly/wiki/Fleet-Management).
+Alloy's own logs are a different stream. They keep `job="integrations/alloy"` and `collector_id="solaredge"`, and they carry the same four resource labels, with `service_name="alloy"`. They are described on [Fleet Management](https://github.com/lewismc/solaredge-olly/wiki/Fleet-Management).
 
 **When exporter logs do not arrive.** Confirm the file tail and the Loki writer are healthy in the Alloy UI. Then check `logs:write`, the Loki instance id, and that the URL ends in `/loki/api/v1/push`.
 

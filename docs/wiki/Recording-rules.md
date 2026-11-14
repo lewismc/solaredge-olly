@@ -10,8 +10,8 @@ A [recording rule](https://grafana.com/docs/grafana-cloud/observe-and-act/alert-
 
 | Series | Every | Query |
 | :--- | :--- | :--- |
-| `solaredge:ac_power:watts` | 1m | `AC_Power * 10 ^ AC_Power_SF`, summed by `job`, `inverter`, `service_namespace`, `deployment_environment` |
-| `solaredge:ac_energy:kwh_24h` | 5m | max minus min of `AC_Energy_WH * 10 ^ AC_Energy_WH_SF` over a `[24h:5m]` subquery, over 1000 |
+| `solaredge:ac_power:watts` | 1m | `AC_Power * 10 ^ AC_Power_SF`, summed by `job`, `inverter`, `service_namespace`, `deployment_environment`, `service_name`, `service_instance_id` |
+| `solaredge:ac_energy:kwh_24h` | 5m | max minus min of `AC_Energy_WH * 10 ^ AC_Energy_WH_SF` over a `[24h:5m]` subquery, over 1000, grouped the same way as the watts rule |
 | `solaredge:performance_ratio` | 1m | watts over `max(Site_Expected_AC_Power_W)`, only while `max(Site_Irradiance_GTI_Wm2) > 200` |
 
 The scale factor is the reason for the first rule. SunSpec sends each value with a power-of-ten exponent, and forgetting it is off by a factor of 10 or 100. The name follows the Prometheus `level:metric:operations` convention.

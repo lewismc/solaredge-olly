@@ -14,3 +14,4 @@
 12. [Host metrics](Host-metrics)
 13. [Recording rules](Recording-rules)
 14. [Knowledge Graph](Knowledge-Graph)
+15. [Alloy memory](Alloy-memory)

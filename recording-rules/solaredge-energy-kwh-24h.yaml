@@ -30,9 +30,9 @@ spec:
       model:
         expr: |-
           (
-            max_over_time((sum by (job, inverter, service_namespace, deployment_environment) (AC_Energy_WH{job="integrations/solaredge"} * 10 ^ AC_Energy_WH_SF{job="integrations/solaredge"}))[24h:5m])
+            max_over_time((sum by (job, inverter, service_namespace, deployment_environment, service_name, service_instance_id) (AC_Energy_WH{job="integrations/solaredge"} * 10 ^ AC_Energy_WH_SF{job="integrations/solaredge"}))[24h:5m])
             -
-            min_over_time((sum by (job, inverter, service_namespace, deployment_environment) (AC_Energy_WH{job="integrations/solaredge"} * 10 ^ AC_Energy_WH_SF{job="integrations/solaredge"}))[24h:5m])
+            min_over_time((sum by (job, inverter, service_namespace, deployment_environment, service_name, service_instance_id) (AC_Energy_WH{job="integrations/solaredge"} * 10 ^ AC_Energy_WH_SF{job="integrations/solaredge"}))[24h:5m])
           ) / 1000
         instant: true
         refId: KWh
