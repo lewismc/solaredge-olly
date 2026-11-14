@@ -1,0 +1,37 @@
+[Unit]
+Description=Prometheus node_exporter for the Raspberry Pi integration
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=node-exporter
+Group=node-exporter
+ExecStart=/opt/solaredge/bin/node_exporter \
+  --web.listen-address=127.0.0.1:9100 \
+  --collector.disable-defaults \
+  --collector.cpu \
+  --collector.diskstats \
+  --collector.filesystem \
+  --collector.hwmon \
+  --collector.loadavg \
+  --collector.meminfo \
+  --collector.netdev \
+  --collector.os \
+  --collector.stat \
+  --collector.systemd \
+  --collector.systemd.unit-include=(alloy|node-exporter|solaredge-.+|sunspec-sim|synthetic-monitoring-agent|ssh)\\.(service|timer) \
+  --collector.textfile \
+  --collector.textfile.directory=/var/lib/node_exporter/textfile \
+  --collector.thermal_zone \
+  --collector.uname \
+  --collector.vmstat \
+  --collector.netdev.device-exclude=^lo$$ \
+  --collector.diskstats.device-include=^mmcblk0$$ \
+  --web.disable-exporter-metrics
+Restart=on-failure
+RestartSec=5
+MemoryMax=32M
+
+[Install]
+WantedBy=multi-user.target

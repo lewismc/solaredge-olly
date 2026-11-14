@@ -6,7 +6,7 @@
 
 ## This stack
 
-[alerting/](https://github.com/lewismc/solaredge-olly/tree/main/alerting) holds five Grafana-managed rules, one resource per file. `gcx resources push` reads the first document in a file. Each rule evaluates every minute and carries `service_name=solaredge-exporter`, which is what [Notifications](https://github.com/lewismc/solaredge-olly/wiki/Notifications) matches. The queries use the Grafana Cloud datasource UIDs `grafanacloud-prom` and `grafanacloud-logs`. Set `grafana.app/folder` to the folder UID before pushing (`gcx resources get folders`). The committed files keep the placeholder `YOUR_FOLDER_UID`.
+[alerting/](https://github.com/lewismc/solaredge-olly/tree/main/alerting) holds seven Grafana-managed rules, one resource per file. `gcx resources push` reads the first document in a file. Each rule evaluates every minute and carries `service_name=solaredge-exporter`, which is what [Notifications](https://github.com/lewismc/solaredge-olly/wiki/Notifications) matches. The queries use the Grafana Cloud datasource UIDs `grafanacloud-prom` and `grafanacloud-logs`. Set `grafana.app/folder` to the folder UID before pushing (`gcx resources get folders`). The committed files keep the placeholder `YOUR_FOLDER_UID`.
 
 The API rejects `grafana.com/group` on create, and a rule sequence has to contain a recording rule, so these rules are not placed in a shared evaluation group.
 
@@ -17,6 +17,10 @@ The API rejects `grafana.com/group` on create, and a rule sequence has to contai
 | Inverter fault | `InverterStatus` (`Status`) equals 7 | 5m | OK |
 | Poll failure | `ModbusReadOK` is below 1 | 5m | NoData |
 | Underperformance | `PowerRatio` is below 0.25 while irradiance is above 200 W/m² | 1h | OK |
+| Unit memory near MemoryMax | `AnonRatio`, a unit's anonymous memory over its `MemoryMax`, is above 0.8 | 15m | OK |
+| Unit OOM kill | `OOMKills`, the 15-minute increase of a unit's `oom_kill` count, is above 0 | 0s | OK |
+
+The two unit rules read the textfile series described on [Host metrics](https://github.com/lewismc/solaredge-olly/wiki/Host-metrics). The Raspberry Pi integration's own alerts (temperature, filesystem, host memory, failed units) are installed with the integration and are not in this directory.
 
 `Status == 2` (Sleeping) is healthy and is not a rule. The exporter-down query keeps the `up` series and thresholds it. A query of `up == 0` is empty while the exporter is up, and `noDataState: Alerting` would fire on that empty result. The poll-failure rule is the same shape on the gauge. A missing gauge is NoData, which is a different failure from a gauge of 0.
 

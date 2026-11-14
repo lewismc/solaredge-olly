@@ -1,0 +1,52 @@
+# Grafana-managed rule. service_name routes it to the Slack contact point in notifications/.
+# Set grafana.app/folder (label and annotation) to your folder UID before pushing.
+# The kernel OOM-killed a process inside a unit's cgroup (memory.events oom_kill),
+# from the textfile collector (deploy/pi/unit-memory.sh). systemd restarts the unit,
+# so up may never drop; this rule catches the kill itself. No for: one kill is enough.
+apiVersion: rules.alerting.grafana.app/v0alpha1
+kind: AlertRule
+metadata:
+  name: solaredge-unit-oom
+  labels:
+    grafana.app/folder: YOUR_FOLDER_UID
+  annotations:
+    grafana.app/folder: YOUR_FOLDER_UID
+spec:
+  title: SolarEdge unit OOM kill
+  labels:
+    service_name: solaredge-exporter
+  for: 0s
+  noDataState: Ok
+  execErrState: Error
+  trigger:
+    interval: 1m0s
+  annotations:
+    summary: '{{ $labels.unit }} had an OOM kill in the last 15 minutes.'
+  expressions:
+    OOMKills:
+      datasourceUID: grafanacloud-prom
+      queryType: instant
+      relativeTimeRange:
+        from: 15m0s
+        to: 0s
+      model:
+        expr: max by (unit) (increase(solaredge_unit_memory_events_total{job="integrations/raspberrypi-node", event="oom_kill"}[15m]))
+        instant: true
+        intervalMs: 1000
+        maxDataPoints: 43200
+        queryType: instant
+        refId: OOMKills
+    Killed:
+      source: true
+      model:
+        type: threshold
+        expression: OOMKills
+        refId: Killed
+        intervalMs: 1000
+        maxDataPoints: 43200
+        conditions:
+          - evaluator:
+              type: gt
+              params:
+                - 0
+            type: gt

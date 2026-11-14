@@ -1,0 +1,38 @@
+# Grafana-managed recording rule. Set grafana.app/folder (label and annotation) to your
+# folder UID before pushing.
+# Energy produced in the last 24 hours, in kWh. AC_Energy_WH is the inverter's lifetime
+# counter, scaled by AC_Energy_WH_SF. max minus min over a 5-minute subquery ignores the
+# gaps while the inverter sleeps. This is a rolling day; a calendar day is a dashboard
+# query over now/d.
+apiVersion: rules.alerting.grafana.app/v0alpha1
+kind: RecordingRule
+metadata:
+  name: solaredge-energy-kwh-24h
+  labels:
+    grafana.app/folder: YOUR_FOLDER_UID
+  annotations:
+    grafana.app/folder: YOUR_FOLDER_UID
+spec:
+  title: solaredge:ac_energy:kwh_24h
+  metric: solaredge:ac_energy:kwh_24h
+  targetDatasourceUID: grafanacloud-prom
+  labels:
+    service_name: solaredge-exporter
+  trigger:
+    interval: 5m0s
+  expressions:
+    KWh:
+      datasourceUID: grafanacloud-prom
+      source: true
+      relativeTimeRange:
+        from: 10m0s
+        to: 0s
+      model:
+        expr: |-
+          (
+            max_over_time((sum by (job, inverter, service_namespace, deployment_environment) (AC_Energy_WH{job="integrations/solaredge"} * 10 ^ AC_Energy_WH_SF{job="integrations/solaredge"}))[24h:5m])
+            -
+            min_over_time((sum by (job, inverter, service_namespace, deployment_environment) (AC_Energy_WH{job="integrations/solaredge"} * 10 ^ AC_Energy_WH_SF{job="integrations/solaredge"}))[24h:5m])
+          ) / 1000
+        instant: true
+        refId: KWh

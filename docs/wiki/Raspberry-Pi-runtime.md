@@ -14,12 +14,15 @@ The live collector is a Raspberry Pi Model B+ Rev 1.2, armv6, 427 MB of RAM, Ras
 | `solaredge-geolocate.service` | `127.0.0.1:9110` | 64M |
 | `alloy.service` | `127.0.0.1:12345` | 220M |
 | `synthetic-monitoring-agent.service` | `127.0.0.1:4050` | 96M |
+| `node-exporter.service` | `127.0.0.1:9100` | 32M |
 
-Alloy sits near 207 MB RSS against that 220 MB cap. The memory controller has to be on the kernel command line (`cgroup_enable=memory cgroup_memory=1`) before `MemoryMax` applies. Confirm `memory` is listed in `/sys/fs/cgroup/cgroup.controllers`.
+`solaredge-unit-memory.timer` writes each unit's cgroup memory for node_exporter every 30 seconds. See [Host metrics](https://github.com/lewismc/solaredge-olly/wiki/Host-metrics).
 
-Neither binary is built on the Pi. [`.github/workflows/alloy-armv6-build.yml`](https://github.com/lewismc/solaredge-olly/blob/main/.github/workflows/alloy-armv6-build.yml) cross-compiles Alloy and the exporter for `GOARCH=arm GOARM=6`, smoke-tests Alloy under qemu, and publishes a GitHub Release. [`.github/workflows/alloy-version-watch.yml`](https://github.com/lewismc/solaredge-olly/blob/main/.github/workflows/alloy-version-watch.yml) opens a pull request when a newer stable Alloy tag exists. The build has to pass before that pin is merged. Alloy carries one patch, [alloy/patches/](https://github.com/lewismc/solaredge-olly/tree/main/alloy/patches), for an armv6 alignment fault.
+Alloy sits near 201 to 207 MB RSS against that 220 MB cap. Only about 40 MB of that is anonymous memory. The rest is file-backed pages of the 363 MB binary, which the kernel reclaims at the cap. The memory controller has to be on the kernel command line (`cgroup_enable=memory cgroup_memory=1`) before `MemoryMax` applies. Confirm `memory` is listed in `/sys/fs/cgroup/cgroup.controllers`.
 
-`solaredge-update.timer` runs [deploy/pi/update.sh](https://github.com/lewismc/solaredge-olly/blob/main/deploy/pi/update.sh) once a day. It downloads the latest release, checks `SHA256SUMS`, points the symlinks at `releases/<tag>/`, and restarts Alloy. The exporter restarts only when its binary changed. For five minutes Alloy must stay active, stay ready on `127.0.0.1:12345`, stay under 220 MB RSS, and log no panic. A failure puts the previous release back. The env file is not part of a release. The units are not copied over the live units, so a release does not switch Alloy off its config.
+No binary is built on the Pi. [`.github/workflows/alloy-armv6-build.yml`](https://github.com/lewismc/solaredge-olly/blob/main/.github/workflows/alloy-armv6-build.yml) cross-compiles Alloy and the exporter for `GOARCH=arm GOARM=6`, fetches the pinned upstream node_exporter `linux-armv6` build and checks its sha256, smoke-tests the binaries under qemu, and publishes a GitHub Release. [`.github/workflows/alloy-version-watch.yml`](https://github.com/lewismc/solaredge-olly/blob/main/.github/workflows/alloy-version-watch.yml) opens a pull request when a newer stable Alloy tag exists. The build has to pass before that pin is merged. Alloy carries one patch, [alloy/patches/](https://github.com/lewismc/solaredge-olly/tree/main/alloy/patches), for an armv6 alignment fault.
+
+`solaredge-update.timer` runs [deploy/pi/update.sh](https://github.com/lewismc/solaredge-olly/blob/main/deploy/pi/update.sh) once a day. It downloads the latest release, checks `SHA256SUMS`, points the symlinks at `releases/<tag>/`, and restarts Alloy. The exporter and node_exporter restart only when their binary changed. For five minutes Alloy must stay active, stay ready on `127.0.0.1:12345`, stay under 220 MB RSS, and log no panic, and node_exporter must stay active. A failure puts the previous release back. The env file is not part of a release. The older units are not copied over the live units, so a release does not switch Alloy off its config. `node-exporter.service` and the unit-memory timer are the exception: `update.sh` installs them from the release bundle and keeps them current. The script does not update itself. After a change to `update.sh`, install it once by hand (`sudo install -m 0755 deploy/pi/update.sh /opt/solaredge/bin/solaredge-update`).
 
 `SHA256SUMS` comes from the same release, so it catches a corrupt download and not a forged one. Each release built on `main` also has a GitHub build-provenance attestation. The Pi does not check it. `gh` and cosign are too large for this host. Check a release from another machine:
 
@@ -27,6 +30,7 @@ Neither binary is built on the Pi. [`.github/workflows/alloy-armv6-build.yml`](h
 gh release download <tag> -R lewismc/solaredge-olly -D /tmp/rel
 gh attestation verify /tmp/rel/alloy-linux-armv6 -R lewismc/solaredge-olly
 gh attestation verify /tmp/rel/solaredge-exporter-linux-armv6 -R lewismc/solaredge-olly
+gh attestation verify /tmp/rel/node_exporter-linux-armv6 -R lewismc/solaredge-olly
 gh attestation verify /tmp/rel/solaredge-bundle.tar.gz -R lewismc/solaredge-olly
 ```
 

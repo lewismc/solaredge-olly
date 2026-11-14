@@ -50,6 +50,20 @@ jobs:
           CGO_ENABLED=0 GOOS=linux GOARCH=arm GOARM=6 \
             go build -ldflags "-s -w" -o "$GITHUB_WORKSPACE/solaredge-exporter-linux-armv6" .
 
+      - name: Fetch node_exporter
+        run: |
+          set -euo pipefail
+          tag=$(tr -d '[:space:]' < node_exporter/VERSION)
+          version=${tag#v}
+          base="https://github.com/prometheus/node_exporter/releases/download/${tag}"
+          tarball="node_exporter-${version}.linux-armv6.tar.gz"
+          cd /tmp
+          curl -fsSLO "${base}/${tarball}"
+          curl -fsSLO "${base}/sha256sums.txt"
+          grep " ${tarball}\$" sha256sums.txt | sha256sum -c -
+          tar -xzf "$tarball"
+          install -m 0755 "node_exporter-${version}.linux-armv6/node_exporter" "$GITHUB_WORKSPACE/node_exporter-linux-armv6"
+
       - name: Pack the config bundle
         run: |
           set -euo pipefail
@@ -85,11 +99,13 @@ jobs:
           qemu-arm-static "$GITHUB_WORKSPACE/alloy-linux-armv6" validate alloy/config.alloy
           qemu-arm-static "$GITHUB_WORKSPACE/alloy-linux-armv6" validate fleet/solaredge.alloy
           file "$GITHUB_WORKSPACE/solaredge-exporter-linux-armv6" | grep -q 'ARM'
+          qemu-arm-static "$GITHUB_WORKSPACE/node_exporter-linux-armv6" --version
+          bash -n deploy/pi/update.sh deploy/pi/unit-memory.sh
 
       - name: Checksums
         run: |
           set -euo pipefail
-          sha256sum alloy-linux-armv6 solaredge-exporter-linux-armv6 solaredge-bundle.tar.gz > SHA256SUMS
+          sha256sum alloy-linux-armv6 solaredge-exporter-linux-armv6 node_exporter-linux-armv6 solaredge-bundle.tar.gz > SHA256SUMS
 
       - name: Attest build provenance
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
@@ -107,8 +123,9 @@ jobs:
           tag="${version}-${GITHUB_SHA::7}"
           gh release create "$tag" \
             --title "$tag" \
-            --notes "linux/arm/v6 Alloy ${version} and the patched SolarEdge exporter. Built from ${GITHUB_SHA}." \
+            --notes "linux/arm/v6 Alloy ${version}, the patched SolarEdge exporter, and node_exporter $(tr -d '[:space:]' < node_exporter/VERSION). Built from ${GITHUB_SHA}." \
             alloy-linux-armv6 \
             solaredge-exporter-linux-armv6 \
+            node_exporter-linux-armv6 \
             solaredge-bundle.tar.gz \
             SHA256SUMS

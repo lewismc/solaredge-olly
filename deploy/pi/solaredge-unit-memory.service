@@ -1,0 +1,7 @@
+[Unit]
+Description=Write SolarEdge unit cgroup memory for node_exporter
+
+[Service]
+Type=oneshot
+ExecStart=/opt/solaredge/bin/solaredge-unit-memory
+Nice=10

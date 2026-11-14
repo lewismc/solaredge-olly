@@ -19,6 +19,10 @@ fi
 
 log() { echo "$(date -Is) $*"; }
 
+node_installed() {
+  [ -e "$BIN/node_exporter" ] && [ -f /etc/systemd/system/node-exporter.service ]
+}
+
 current_tag() {
   if [ -f "$CURRENT_FILE" ]; then
     tr -d '[:space:]' < "$CURRENT_FILE"
@@ -45,6 +49,9 @@ health_check() {
     if [ -n "${rss:-}" ] && [ "$rss" -gt "$RSS_LIMIT_KB" ]; then
       return 1
     fi
+    if node_installed; then
+      systemctl is-active --quiet node-exporter.service || return 1
+    fi
     if curl -sf --max-time 3 http://127.0.0.1:12345/-/ready >/dev/null; then
       ready=1
     fi
@@ -66,11 +73,34 @@ install_configs() {
   if [ -f "$src/sunspec-sim/server.py" ]; then
     install -m 0644 -o sunspec -g sunspec "$src/sunspec-sim/server.py" /opt/solaredge/sim/server.py
   fi
+  install_node_units "$src/deploy/pi"
 }
 
-exporter_sha() {
-  if [ -e "$BIN/solaredge-exporter" ]; then
-    sha256sum "$BIN/solaredge-exporter" | awk '{print $1}'
+# node-exporter and the unit-memory timer are installed and kept current from the
+# bundle. The older units (alloy, exporter, geolocate) are still installed by hand.
+install_node_units() {
+  local pi="$1" f changed=0
+  [ -f "$pi/node-exporter.service" ] || return 0
+  id -u node-exporter >/dev/null 2>&1 ||
+    useradd --system --no-create-home --shell /usr/sbin/nologin node-exporter
+  install -d -m 0755 /var/lib/node_exporter /var/lib/node_exporter/textfile
+  install -m 0755 "$pi/unit-memory.sh" "$BIN/solaredge-unit-memory"
+  for f in node-exporter.service solaredge-unit-memory.service solaredge-unit-memory.timer; do
+    if ! cmp -s "$pi/$f" "/etc/systemd/system/$f"; then
+      install -m 0644 "$pi/$f" "/etc/systemd/system/$f"
+      changed=1
+    fi
+  done
+  if [ "$changed" = 1 ]; then
+    systemctl daemon-reload
+    systemctl enable node-exporter.service solaredge-unit-memory.timer
+    systemctl start solaredge-unit-memory.timer
+  fi
+}
+
+sha_of() {
+  if [ -e "$1" ]; then
+    sha256sum "$1" | awk '{print $1}'
   else
     echo none
   fi
@@ -81,6 +111,12 @@ point_at() {
   ln -sfn "$REL/$tag/alloy" "$BIN/alloy"
   if [ -f "$REL/$tag/solaredge-exporter" ]; then
     ln -sfn "$REL/$tag/solaredge-exporter" "$BIN/solaredge-exporter"
+  fi
+  if [ -f "$REL/$tag/node_exporter" ]; then
+    ln -sfn "$REL/$tag/node_exporter" "$BIN/node_exporter"
+  elif [ -e "$BIN/node_exporter" ] || [ -L "$BIN/node_exporter" ]; then
+    systemctl stop node-exporter.service || true
+    rm -f "$BIN/node_exporter"
   fi
 }
 
@@ -93,6 +129,9 @@ if [ -n "$STAGE" ]; then
   install -m 0755 "$STAGE/alloy" "$REL/$tag/alloy"
   if [ -f "$STAGE/solaredge-exporter" ]; then
     install -m 0755 "$STAGE/solaredge-exporter" "$REL/$tag/solaredge-exporter"
+  fi
+  if [ -f "$STAGE/node_exporter" ]; then
+    install -m 0755 "$STAGE/node_exporter" "$REL/$tag/node_exporter"
   fi
 else
   meta=$(mktemp)
@@ -120,6 +159,7 @@ release = json.load(open(sys.argv[1]))
 wanted = {
     "alloy-linux-armv6",
     "solaredge-exporter-linux-armv6",
+    "node_exporter-linux-armv6",
     "solaredge-bundle.tar.gz",
     "SHA256SUMS",
 }
@@ -137,19 +177,28 @@ PY
   mkdir -p "$REL/$tag"
   install -m 0755 "$work/alloy-linux-armv6" "$REL/$tag/alloy"
   install -m 0755 "$work/solaredge-exporter-linux-armv6" "$REL/$tag/solaredge-exporter"
+  if [ -f "$work/node_exporter-linux-armv6" ]; then
+    install -m 0755 "$work/node_exporter-linux-armv6" "$REL/$tag/node_exporter"
+  fi
   tar -C "$work" -xzf "$work/solaredge-bundle.tar.gz"
   install_configs "$work"
   rm -rf "$work" "$meta"
 fi
 
-before_exporter=$(exporter_sha)
+before_exporter=$(sha_of "$BIN/solaredge-exporter")
+before_node=$(sha_of "$BIN/node_exporter")
 point_at "$tag"
 systemctl restart alloy.service
 exporter_restarted=0
-after_exporter=$(exporter_sha)
-if [ "$before_exporter" != "$after_exporter" ]; then
+if [ "$before_exporter" != "$(sha_of "$BIN/solaredge-exporter")" ]; then
   systemctl restart solaredge-exporter.service
   exporter_restarted=1
+fi
+node_restarted=0
+if node_installed &&
+  { [ "$before_node" != "$(sha_of "$BIN/node_exporter")" ] || ! systemctl is-active --quiet node-exporter.service; }; then
+  systemctl restart node-exporter.service
+  node_restarted=1
 fi
 
 if health_check; then
@@ -169,6 +218,9 @@ if [ -n "$prev" ] && [ -d "$REL/$prev" ]; then
   if [ "$exporter_restarted" = 1 ]; then
     systemctl restart solaredge-exporter.service
   fi
+  if [ "$node_restarted" = 1 ] && node_installed; then
+    systemctl restart node-exporter.service
+  fi
 fi
-rm -rf "$REL/$tag"
+rm -rf "${REL:?}/${tag:?}"
 exit 1

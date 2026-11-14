@@ -1,0 +1,32 @@
+# Grafana-managed recording rule. Set grafana.app/folder (label and annotation) to your
+# folder UID before pushing.
+# Actual AC power over the Open-Meteo expected power. Recorded only while GTI is above
+# 200 W/m2, the same gate as the underperformance alert, so night and overcast samples
+# do not drag the ratio toward zero.
+apiVersion: rules.alerting.grafana.app/v0alpha1
+kind: RecordingRule
+metadata:
+  name: solaredge-performance-ratio
+  labels:
+    grafana.app/folder: YOUR_FOLDER_UID
+  annotations:
+    grafana.app/folder: YOUR_FOLDER_UID
+spec:
+  title: solaredge:performance_ratio
+  metric: solaredge:performance_ratio
+  targetDatasourceUID: grafanacloud-prom
+  labels:
+    service_name: solaredge-exporter
+  trigger:
+    interval: 1m0s
+  expressions:
+    Ratio:
+      datasourceUID: grafanacloud-prom
+      source: true
+      relativeTimeRange:
+        from: 10m0s
+        to: 0s
+      model:
+        expr: sum by (service_namespace, deployment_environment) (AC_Power{job="integrations/solaredge"} * 10 ^ AC_Power_SF{job="integrations/solaredge"}) / on() group_left max(Site_Expected_AC_Power_W{job="integrations/solaredge-geolocate"}) and on() (max(Site_Irradiance_GTI_Wm2{job="integrations/solaredge-geolocate"}) > 200)
+        instant: true
+        refId: Ratio

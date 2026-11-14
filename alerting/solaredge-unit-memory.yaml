@@ -1,0 +1,54 @@
+# Grafana-managed rule. service_name routes it to the Slack contact point in notifications/.
+# Set grafana.app/folder (label and annotation) to your folder UID before pushing.
+# Anonymous memory of each unit over its MemoryMax, from the textfile collector
+# (deploy/pi/unit-memory.sh). anon, not RSS or memory.current: Alloy's RSS is mostly
+# file-backed pages of its binary, which the kernel reclaims at memory.max, so RSS sits
+# near the cap without any OOM risk. Data starts with the first release that ships
+# node_exporter, so NoData is OK.
+apiVersion: rules.alerting.grafana.app/v0alpha1
+kind: AlertRule
+metadata:
+  name: solaredge-unit-memory
+  labels:
+    grafana.app/folder: YOUR_FOLDER_UID
+  annotations:
+    grafana.app/folder: YOUR_FOLDER_UID
+spec:
+  title: SolarEdge unit memory near MemoryMax
+  labels:
+    service_name: solaredge-exporter
+  for: 15m0s
+  noDataState: Ok
+  execErrState: Error
+  trigger:
+    interval: 1m0s
+  annotations:
+    summary: '{{ $labels.unit }} anonymous memory is above 80% of its MemoryMax.'
+  expressions:
+    AnonRatio:
+      datasourceUID: grafanacloud-prom
+      queryType: instant
+      relativeTimeRange:
+        from: 5m0s
+        to: 0s
+      model:
+        expr: max by (unit) (solaredge_unit_memory_bytes{job="integrations/raspberrypi-node", kind="anon"}) / max by (unit) (solaredge_unit_memory_max_bytes{job="integrations/raspberrypi-node"})
+        instant: true
+        intervalMs: 1000
+        maxDataPoints: 43200
+        queryType: instant
+        refId: AnonRatio
+    NearCap:
+      source: true
+      model:
+        type: threshold
+        expression: AnonRatio
+        refId: NearCap
+        intervalMs: 1000
+        maxDataPoints: 43200
+        conditions:
+          - evaluator:
+              type: gt
+              params:
+                - 0.8
+            type: gt

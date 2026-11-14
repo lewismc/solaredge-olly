@@ -24,6 +24,8 @@ AC_Power * on(inverter) group_left(manufacturer, model, serial, version) Inverte
 
 Meter series use the prefixes `M_`, `M2_`, and `M3_`. Batteries are not collected. A healthy check is `up{job="integrations/solaredge"}` and `AC_Power`.
 
+Every series this pipeline ships also carries `service_namespace="solaredge"` and `deployment_environment="home"`. One `prometheus.relabel "common"` stage in [fleet/solaredge.alloy](https://github.com/lewismc/solaredge-olly/blob/main/fleet/solaredge.alloy) adds them just before remote write, so a new scrape gets them without its own rule. The exporter's log stream carries the same two labels. They are the OpenTelemetry resource attribute names, with dots replaced by underscores. The Knowledge Graph maps `deployment_environment` to its environment scope. The series from Fleet Management's generated `self_monitoring_metrics` pipeline do not pass through this stage and do not get the labels. When the labels first arrived, each series changed identity. For up to five minutes the old and new copies overlap, so a `sum` across them can double for one evaluation.
+
 Alloy's own `/metrics` is a second stream, about 1,000 series, under `job="integrations/alloy"`. That is described on [Fleet Management](https://github.com/lewismc/solaredge-olly/wiki/Fleet-Management).
 
 **When no samples arrive.** In the Alloy UI, confirm the scrape is healthy. Then check the access policy includes `metrics:write`, and that the URL, the instance id, and the token belong to the same stack.

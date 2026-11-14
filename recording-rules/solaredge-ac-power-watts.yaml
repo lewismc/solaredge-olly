@@ -1,0 +1,31 @@
+# Grafana-managed recording rule. Set grafana.app/folder (label and annotation) to your
+# folder UID before pushing.
+# SunSpec sends a value and a power-of-ten scale factor. This rule applies the scale
+# factor once, so dashboards and alerts read watts directly.
+apiVersion: rules.alerting.grafana.app/v0alpha1
+kind: RecordingRule
+metadata:
+  name: solaredge-ac-power-watts
+  labels:
+    grafana.app/folder: YOUR_FOLDER_UID
+  annotations:
+    grafana.app/folder: YOUR_FOLDER_UID
+spec:
+  title: solaredge:ac_power:watts
+  metric: solaredge:ac_power:watts
+  targetDatasourceUID: grafanacloud-prom
+  labels:
+    service_name: solaredge-exporter
+  trigger:
+    interval: 1m0s
+  expressions:
+    Watts:
+      datasourceUID: grafanacloud-prom
+      source: true
+      relativeTimeRange:
+        from: 10m0s
+        to: 0s
+      model:
+        expr: sum by (job, inverter, service_namespace, deployment_environment) (AC_Power{job="integrations/solaredge"} * 10 ^ AC_Power_SF{job="integrations/solaredge"})
+        instant: true
+        refId: Watts
