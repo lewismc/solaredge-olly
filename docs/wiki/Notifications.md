@@ -6,7 +6,7 @@ A contact point is where Grafana delivers an alert. A notification policy is a t
 
 ## This stack
 
-[notifications/slack-contact-point.yaml](https://github.com/lewismc/solaredge-olly/blob/main/notifications/slack-contact-point.yaml) is the contact point `solaredge-slack`, type `slack`, an incoming webhook bound to one private channel. The URL is `${SLACK_WEBHOOK_URL}` and lives in `.env`. It is never committed.
+[notifications/slack-contact-point.yaml](https://github.com/lewismc/solaredge-olly/blob/main/notifications/slack-contact-point.yaml) is the contact point `solaredge-slack`, type `slack`, an incoming webhook bound to the private channel `#alerts` in the SolarEdge Observability Slack workspace. The webhook URL, not the recipient field, chooses the channel. The URL is `${SLACK_WEBHOOK_URL}` and lives in `.env`. It is never committed.
 
 [notifications/policy-tree.yaml](https://github.com/lewismc/solaredge-olly/blob/main/notifications/policy-tree.yaml) is the whole tree. The default receiver stays `grafana-default-email`. One child route matches `service_name=solaredge-exporter` and sends to `solaredge-slack`, grouping by `alertname` and `grafana_slo_uuid`, with a 30 second group wait, a 5 minute group interval, and a 12 hour repeat. The five rules and both SLOs' burn-rate alerts carry that label, so no rule names a contact point. Merge any other route on the stack into the file before setting it.
 
