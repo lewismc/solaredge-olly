@@ -8,8 +8,8 @@ index 77189e0..0a2ad42 100644
 +// The armv6 collector runs `alloy run`, not `alloy otel`.
 +// The generated file registers the full OpenTelemetry Collector contrib set,
 +// and the linker keeps every package it imports. This replacement leaves the
-+// factory list empty so those packages are not linked. Phase 2 exports OTLP
-+// from geolocate directly and does not need this engine.
++// factory list empty so those packages are not linked. Phase 2 receives OTLP
++// through the native otelcol components in the allowlist, not this engine.
  package main
  
  import (
@@ -325,7 +325,7 @@ diff --git a/internal/component/all/all.go b/internal/component/all/all.go
 index b7fd652..05756ab 100644
 --- a/internal/component/all/all.go
 +++ b/internal/component/all/all.go
-@@ -1,188 +1,16 @@
+@@ -1,188 +1,20 @@
 -// Package all imports all known component packages.
 +// Package all imports the component packages this collector runs.
 +// The upstream file imports every component. This copy is the armv6 allowlist.
@@ -515,14 +515,18 @@ index b7fd652..05756ab 100644
 -	_ "github.com/grafana/alloy/internal/component/remote/kubernetes/secret"                 // Import remote.kubernetes.secret
 -	_ "github.com/grafana/alloy/internal/component/remote/s3"                                // Import remote.s3
 -	_ "github.com/grafana/alloy/internal/component/remote/vault"                             // Import remote.vault
-+	_ "github.com/grafana/alloy/internal/component/discovery/relabel"        // Import discovery.relabel
-+	_ "github.com/grafana/alloy/internal/component/local/file_match"         // Import local.file_match
-+	_ "github.com/grafana/alloy/internal/component/loki/process"             // Import loki.process
-+	_ "github.com/grafana/alloy/internal/component/loki/source/file"         // Import loki.source.file
-+	_ "github.com/grafana/alloy/internal/component/loki/source/journal"      // Import loki.source.journal
-+	_ "github.com/grafana/alloy/internal/component/loki/write"               // Import loki.write
-+	_ "github.com/grafana/alloy/internal/component/prometheus/exporter/self" // Import prometheus.exporter.self
-+	_ "github.com/grafana/alloy/internal/component/prometheus/relabel"       // Import prometheus.relabel
-+	_ "github.com/grafana/alloy/internal/component/prometheus/remotewrite"   // Import prometheus.remote_write
-+	_ "github.com/grafana/alloy/internal/component/prometheus/scrape"        // Import prometheus.scrape
++	_ "github.com/grafana/alloy/internal/component/discovery/relabel"         // Import discovery.relabel
++	_ "github.com/grafana/alloy/internal/component/local/file_match"          // Import local.file_match
++	_ "github.com/grafana/alloy/internal/component/loki/process"              // Import loki.process
++	_ "github.com/grafana/alloy/internal/component/loki/source/file"          // Import loki.source.file
++	_ "github.com/grafana/alloy/internal/component/loki/source/journal"       // Import loki.source.journal
++	_ "github.com/grafana/alloy/internal/component/loki/write"                // Import loki.write
++	_ "github.com/grafana/alloy/internal/component/otelcol/auth/basic"        // Import otelcol.auth.basic
++	_ "github.com/grafana/alloy/internal/component/otelcol/exporter/otlphttp" // Import otelcol.exporter.otlphttp
++	_ "github.com/grafana/alloy/internal/component/otelcol/processor/batch"   // Import otelcol.processor.batch
++	_ "github.com/grafana/alloy/internal/component/otelcol/receiver/otlp"     // Import otelcol.receiver.otlp
++	_ "github.com/grafana/alloy/internal/component/prometheus/exporter/self"  // Import prometheus.exporter.self
++	_ "github.com/grafana/alloy/internal/component/prometheus/relabel"        // Import prometheus.relabel
++	_ "github.com/grafana/alloy/internal/component/prometheus/remotewrite"    // Import prometheus.remote_write
++	_ "github.com/grafana/alloy/internal/component/prometheus/scrape"         // Import prometheus.scrape
  )
