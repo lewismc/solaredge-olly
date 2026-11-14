@@ -9,6 +9,8 @@ User=alloy
 Group=alloy
 SupplementaryGroups=solaredge
 EnvironmentFile=/etc/solaredge/solaredge.env
+# Soft cap on the Go heap. It does not shrink file-backed pages of the binary.
+Environment=GOMEMLIMIT=80MiB
 ExecStart=/opt/solaredge/bin/alloy run --server.http.listen-addr=127.0.0.1:12345 --storage.path=/var/lib/alloy/data /etc/alloy/solaredge.alloy
 Restart=on-failure
 RestartSec=5

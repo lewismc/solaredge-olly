@@ -33,6 +33,7 @@ jobs:
           version=$(tr -d '[:space:]' < alloy/VERSION)
           git clone --depth 1 --branch "$version" https://github.com/grafana/alloy.git /tmp/alloy
           git -C /tmp/alloy apply "$GITHUB_WORKSPACE/alloy/patches/fanout-align.patch"
+          git -C /tmp/alloy apply "$GITHUB_WORKSPACE/alloy/patches/component-allowlist.patch"
           cd /tmp/alloy/collector
           CGO_ENABLED=0 GOOS=linux GOARCH=arm GOARM=6 \
             go build -tags netgo -ldflags "-s -w" -o "$GITHUB_WORKSPACE/alloy-linux-armv6" .
@@ -123,7 +124,7 @@ jobs:
           tag="${version}-${GITHUB_SHA::7}"
           gh release create "$tag" \
             --title "$tag" \
-            --notes "linux/arm/v6 Alloy ${version}, the patched SolarEdge exporter, and node_exporter $(tr -d '[:space:]' < node_exporter/VERSION). Built from ${GITHUB_SHA}." \
+            --notes "linux/arm/v6 Alloy ${version} with the component allowlist, the patched SolarEdge exporter, and node_exporter $(tr -d '[:space:]' < node_exporter/VERSION). Built from ${GITHUB_SHA}." \
             alloy-linux-armv6 \
             solaredge-exporter-linux-armv6 \
             node_exporter-linux-armv6 \
