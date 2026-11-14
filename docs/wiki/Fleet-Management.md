@@ -2,7 +2,7 @@
 
 ## The product
 
-Fleet Management stores Alloy configuration in Grafana Cloud and delivers it to collectors. A collector runs a small local bootstrap, a `remotecfg` block, and polls for the pipelines that match its attributes. One pipeline can target many collectors. The collector id is how you tell two installs apart. Secrets stay on the collector. The remote config should not contain them.
+[Fleet Management](https://grafana.com/docs/grafana-cloud/send-data/fleet-management/) stores Alloy configuration in Grafana Cloud and delivers it to collectors. A collector runs a small local bootstrap, a `remotecfg` block, and polls for the pipelines that match its attributes. One pipeline can target many collectors. The collector id is how you tell two installs apart. Secrets stay on the collector. The remote config should not contain them.
 
 ## This stack
 

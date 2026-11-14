@@ -2,7 +2,7 @@
 
 ## The product
 
-A Geomap panel plots a series that carries a location. The location and the "what should have been produced" number are not things the inverter reports. A second exporter computes them and Alloy scrapes it as its own job, so the device alerts stay about the device. The model is a forecast, not a measurement. Treat the ratio as a direction.
+A [Geomap](https://grafana.com/docs/grafana/latest/visualizations/panels-visualizations/visualizations/geomap/) panel plots a series that carries a location. The location and the "what should have been produced" number are not things the inverter reports. A second exporter computes them and Alloy scrapes it as its own job, so the device alerts stay about the device. The model is a forecast, not a measurement. Treat the ratio as a direction.
 
 ## This stack
 

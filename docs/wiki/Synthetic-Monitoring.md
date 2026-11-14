@@ -2,7 +2,7 @@
 
 ## The product
 
-Synthetic Monitoring runs a check from a probe on a schedule and records whether the check passed. A private probe is an agent you run, pointed at a target the public probes cannot reach. The check result is a metric (`probe_success`) and a log. It answers "could the probe fetch this URL". It does not answer "did the device produce a new sample". Those are different questions, and a check that only fetches `/metrics` will stay green while the device is stuck, as long as the last scrape is still being served.
+[Synthetic Monitoring](https://grafana.com/docs/grafana-cloud/testing/synthetic-monitoring/) runs a check from a probe on a schedule and records whether the check passed. A private probe is an agent you run, pointed at a target the public probes cannot reach. The check result is a metric (`probe_success`) and a log. It answers "could the probe fetch this URL". It does not answer "did the device produce a new sample". Those are different questions, and a check that only fetches `/metrics` will stay green while the device is stuck, as long as the last scrape is still being served.
 
 ## This stack
 

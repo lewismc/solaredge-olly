@@ -2,7 +2,7 @@
 
 ## The product
 
-The collector has to run somewhere. Grafana Cloud does not care whether that host is a container or a systemd unit. The host's limits do. A small machine decides the shape of the collector: which components fit, where the binary is built, and how an upgrade rolls back. Fleet Management, metrics, and logs are the same products either way. The runtime is the constraint you design for.
+The collector has to run somewhere. Grafana Cloud does not care whether that host is a container or a systemd unit. The host's limits do. A small machine decides the shape of the collector: which components fit, where the binary is built, and how an upgrade rolls back. [Fleet Management](https://grafana.com/docs/grafana-cloud/send-data/fleet-management/), [metrics](https://grafana.com/docs/grafana-cloud/send-data/metrics/), and [logs](https://grafana.com/docs/grafana-cloud/send-data/logs/) are the same products either way. The runtime is the constraint you design for.
 
 ## This stack
 

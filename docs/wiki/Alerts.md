@@ -2,7 +2,7 @@
 
 ## The product
 
-Grafana Alerting evaluates rules on an interval and moves an instance through pending and firing. A rule is a query plus a condition, held for a duration so one bad sample does not page. `NoData` and `Error` are states you choose: a missing series can be fine (night) or a failure (the scrape vanished). Rules do not name a contact point. A label does, and the notification policy matches it. That split is what lets one route cover rules you have not written yet.
+[Grafana Alerting](https://grafana.com/docs/grafana/latest/alerting/) evaluates rules on an interval and moves an instance through pending and firing. A rule is a query plus a condition, held for a duration so one bad sample does not page. `NoData` and `Error` are states you choose: a missing series can be fine (night) or a failure (the scrape vanished). Rules do not name a contact point. A label does, and the notification policy matches it. That split is what lets one route cover rules you have not written yet.
 
 ## This stack
 

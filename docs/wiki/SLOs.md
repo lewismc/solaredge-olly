@@ -2,7 +2,7 @@
 
 ## The product
 
-A Grafana Cloud SLO is an objective (for example 99% of good events over 28 days) plus a definition of a good event. The app burns an error budget and alerts on a fast burn and a slow burn. The label `service_name` is what the SLO app reads for the service column. A label named `service` does not count. A burn alert can carry an enrichment. `assistantInvestigation` starts a Grafana Assistant investigation when the burn fires.
+A [Grafana Cloud SLO](https://grafana.com/docs/grafana-cloud/alerting-and-irm/slo/) is an objective (for example 99% of good events over 28 days) plus a definition of a good event. The app burns an error budget and alerts on a fast burn and a slow burn. The label `service_name` is what the SLO app reads for the service column. A label named `service` does not count. A burn alert can carry an enrichment. `assistantInvestigation` starts a [Grafana Assistant](https://grafana.com/docs/grafana-cloud/machine-learning/assistant/) investigation when the burn fires.
 
 The event has to be something a ratio or a threshold can see. A gauge that sits at 1 between polls is not a rate. Wrapping it in `rate()` produces a number near 0 and an SLO that is always failing.
 

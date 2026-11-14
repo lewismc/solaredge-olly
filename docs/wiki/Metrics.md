@@ -2,7 +2,7 @@
 
 ## The product
 
-Grafana Cloud Metrics is a Prometheus store. Alloy remote-writes samples to it. A series is a name plus labels. Cardinality is the count of those combinations, and it is what the bill tracks. PromQL computes on the stored samples. Scale, units, and "is this the right series" are the sender's job. The store will not fix them.
+[Grafana Cloud Metrics](https://grafana.com/docs/grafana-cloud/send-data/metrics/) is a Prometheus store. Alloy remote-writes samples to it. A series is a name plus labels. Cardinality is the count of those combinations, and it is what the bill tracks. PromQL computes on the stored samples. Scale, units, and "is this the right series" are the sender's job. The store will not fix them.
 
 ## This stack
 

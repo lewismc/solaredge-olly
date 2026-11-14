@@ -2,7 +2,7 @@
 
 ## The product
 
-A Grafana dashboard is a saved layout of queries. A variable filters every panel from one control. A v2 dashboard (`dashboard.grafana.app/v2`) is a resource you can push, the same way as an alert rule. The dashboard is not the source of truth for the data. The queries are. If a panel is empty, the query or the label match is wrong before the panel is.
+A [Grafana dashboard](https://grafana.com/docs/grafana/latest/dashboards/) is a saved layout of queries. A variable filters every panel from one control. A v2 dashboard (`dashboard.grafana.app/v2`) is a resource you can push, the same way as an alert rule. The dashboard is not the source of truth for the data. The queries are. If a panel is empty, the query or the label match is wrong before the panel is.
 
 ## This stack
 

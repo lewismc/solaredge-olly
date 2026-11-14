@@ -2,7 +2,7 @@
 
 ## The product
 
-Grafana Alloy is the collector. It scrapes a Prometheus exporter and remote-writes the samples. The exporter is ordinary software that speaks the device's protocol and exposes `/metrics`. Alloy does not know Modbus. The split is the one to keep: a small exporter per protocol, one collector for delivery.
+[Grafana Alloy](https://grafana.com/docs/alloy/latest/) is the collector. It scrapes a Prometheus exporter and remote-writes the samples. The exporter is ordinary software that speaks the device's protocol and exposes `/metrics`. Alloy does not know Modbus. The split is the one to keep: a small exporter per protocol, one collector for delivery.
 
 ## This stack
 

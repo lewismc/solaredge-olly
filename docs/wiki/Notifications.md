@@ -2,7 +2,7 @@
 
 ## The product
 
-A contact point is where Grafana delivers an alert. A notification policy is a tree of matchers that pick the contact point. The default route catches everything that no child matches. `set` replaces the whole tree, so a file that only contains your route will delete every other route on the stack. Secrets (a webhook URL, a token) belong in the contact point's secure fields, filled at apply time, not in the file you commit.
+A [contact point](https://grafana.com/docs/grafana/latest/alerting/configure-notifications/manage-contact-points/) is where Grafana delivers an alert. A [notification policy](https://grafana.com/docs/grafana/latest/alerting/configure-notifications/create-notification-policy/) is a tree of matchers that pick the contact point. The default route catches everything that no child matches. `set` replaces the whole tree, so a file that only contains your route will delete every other route on the stack. Secrets (a webhook URL, a token) belong in the contact point's secure fields, filled at apply time, not in the file you commit.
 
 ## This stack
 

@@ -2,7 +2,7 @@
 
 ## The product
 
-Grafana Cloud Logs is a Loki store. Alloy pushes log streams. A stream is defined by its labels. Labels are indexed. Everything else is in the line body and is filtered after the stream is selected. High-cardinality labels (an IP that DHCP can change, a user id, a trace id) multiply streams and cost. Put those in the line and parse them with `| json`.
+[Grafana Cloud Logs](https://grafana.com/docs/grafana-cloud/send-data/logs/) is a [Loki](https://grafana.com/docs/loki/latest/) store. Alloy pushes log streams. A stream is defined by its labels. Labels are indexed. Everything else is in the line body and is filtered after the stream is selected. High-cardinality labels (an IP that DHCP can change, a user id, a trace id) multiply streams and cost. Put those in the line and parse them with `| json`.
 
 ## This stack
 
