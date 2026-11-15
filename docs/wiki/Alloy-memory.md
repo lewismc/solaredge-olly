@@ -20,8 +20,9 @@ The armv6 workflow applies [alloy/patches/component-allowlist.patch](https://git
 - `local.file_match`
 - `loki.process`, `loki.source.file`, `loki.source.journal`, `loki.write`
 - `prometheus.exporter.self`, `prometheus.relabel`, `prometheus.remote_write`, `prometheus.scrape`
+- `otelcol.receiver.otlp`, `otelcol.processor.batch`, `otelcol.exporter.otlphttp`, `otelcol.auth.basic`, for the geolocate traces
 
-`remotecfg` and `import.file` are part of the Alloy runtime, not rows in that file. It also replaces the generated OTel factory list with an empty one. The Pi runs `alloy run`. Phase 2 sends traces from geolocate straight to the OTLP gateway, so this binary does not need `alloy otel`. The OpAMP supervisor command is still linked.
+`remotecfg` and `import.file` are part of the Alloy runtime, not rows in that file. It also replaces the generated OTel factory list with an empty one. The Pi runs `alloy run`. Phase 2 receives geolocate's traces on `otelcol.receiver.otlp` and forwards them with `otelcol.exporter.otlphttp`. Those are native Alloy components, so this binary does not need `alloy otel`. The OpAMP supervisor command is still linked.
 
 A local `linux/arm/v6` build of that patch is 302 MB. The release-built binary is 300 MB, against 346 MB before the slim release. Dropping the unused OpAMP supervisor command as well saved under 1 MB, so the patch leaves it.
 
@@ -35,6 +36,8 @@ Readings from `solaredge_unit_memory_bytes{unit="alloy.service"}`, measured at 0
 | `v1.21.2-c9fb27c`, 01:05 to 08:35 PT | 46 MB | 172 MB | 30% of the time |
 
 Anonymous memory did not change between the releases. The cgroup pressure dropped on `c9fb27c`. Alloy RSS peaked at 201 MB and then 208 MB, with no `max` or `oom_kill` events in either window. Whether the binary is the cause is not proven, and the first window may include page-cache churn after a restart.
+
+Phase 2 added the four OTel components above to the allowlist, and the release `v1.21.2-b72e125` was installed on 2026-11-14 at 09:41 PT. The binary is the same size as `c9fb27c` and has a different checksum. Anonymous memory stayed at 43 MB. Right after the restart, file-backed pages rose from 104 MB to 177 MB, so `memory.current` sat at about 96% of `MemoryMax` (221 MB of 220 MiB) for at least 13 minutes. The cgroup recorded no `max` or `oom_kill` events. The health check passed. The earlier `c9fb27c` window settled to about 155 MB after several hours, so the steady state is not yet known. This is the same pattern as the first window above.
 
 ## Reuse on a customer system
 

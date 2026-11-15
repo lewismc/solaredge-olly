@@ -22,8 +22,11 @@ import sys
 import threading
 import time
 from datetime import datetime, timezone
+from urllib.parse import urlsplit
 
 import requests
+from opentelemetry import trace
+from opentelemetry.trace import SpanKind, Status, StatusCode
 from prometheus_client import REGISTRY, start_http_server
 from prometheus_client.core import GaugeMetricFamily
 
@@ -44,11 +47,58 @@ COORD_PLACES = 4
 SOURCE_IP = "Public IP lookup"
 SOURCE_SET = "Set coordinates"
 
+# The API has no provider until setup_tracing() runs, so spans are no-ops when
+# OTEL_EXPORTER_OTLP_ENDPOINT is unset.
+tracer = trace.get_tracer("solaredge.geolocate")
+
 
 def log(level, msg, **fields):
     record = {"ts": datetime.now(timezone.utc).isoformat(), "level": level, "msg": msg}
     record.update(fields)
     print(json.dumps(record), flush=True)
+
+
+def setup_tracing():
+    """Export spans over OTLP/HTTP when OTEL_EXPORTER_OTLP_ENDPOINT is set.
+
+    On the Pi that endpoint is Alloy on 127.0.0.1, and Alloy holds the Grafana Cloud
+    credentials, so this process holds no secret. Returns False when tracing is off.
+    """
+    if not os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT", "").strip():
+        return False
+    from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
+    from opentelemetry.sdk.resources import Resource
+    from opentelemetry.sdk.trace import TracerProvider
+    from opentelemetry.sdk.trace.export import BatchSpanProcessor
+
+    provider = TracerProvider(resource=Resource.create({
+        "service.name": "solaredge-geolocate",
+        "service.namespace": "solaredge",
+        "deployment.environment": "home",
+    }))
+    provider.add_span_processor(BatchSpanProcessor(OTLPSpanExporter()))
+    trace.set_tracer_provider(provider)
+    return True
+
+
+def http_get(span_name, url, **kwargs):
+    """requests.get inside a CLIENT span.
+
+    The span carries the host, the path, and the status code. It never carries the
+    query string (Open-Meteo gets the coordinates there) or the response body (ipinfo
+    returns the public IP there). An export failure is logged by OpenTelemetry in the
+    background and never raises here.
+    """
+    parsed = urlsplit(url)
+    with tracer.start_as_current_span(span_name, kind=SpanKind.CLIENT) as span:
+        span.set_attribute("http.request.method", "GET")
+        span.set_attribute("server.address", parsed.hostname or "")
+        span.set_attribute("url.path", parsed.path)
+        resp = requests.get(url, **kwargs)
+        span.set_attribute("http.response.status_code", resp.status_code)
+        if resp.status_code >= 400:
+            span.set_status(Status(StatusCode.ERROR, f"HTTP {resp.status_code}"))
+        return resp
 
 
 def env_float(name, default, lo=None, hi=None):
@@ -229,7 +279,7 @@ def resolve_manual(state, lat_raw, lon_raw, now):
 
 
 def fetch_ipinfo():
-    resp = requests.get(IPINFO_URL, timeout=HTTP_TIMEOUT_S)
+    resp = http_get("ipinfo lookup", IPINFO_URL, timeout=HTTP_TIMEOUT_S)
     resp.raise_for_status()
     data = resp.json()
     loc_raw = data.get("loc")
@@ -280,7 +330,8 @@ def refresh_irradiance(state, pv, now):
     with state.lock:
         loc = dict(state.location)
     try:
-        resp = requests.get(
+        resp = http_get(
+            "open-meteo forecast",
             OPEN_METEO_URL,
             params={
                 "latitude": loc["lat"],
@@ -374,6 +425,8 @@ def run_loop(state, pv, stop):
 
 def main():
     pv = load_pv_config()
+    tracing = setup_tracing()
+    log("info", "tracing", enabled=tracing)
     state = State()
     startup_location(state)
 

@@ -60,6 +60,25 @@ health_check() {
   [ "$ready" = 1 ]
 }
 
+# Install geolocate's pinned requirements into its venv when the file changes.
+# Wheels only, so no source build script runs as root. The stamp records the
+# requirements file that was installed last.
+install_geolocate_deps() {
+  local req="$1" venv=/opt/solaredge/geolocate/venv stamp
+  stamp="$venv/.requirements.installed"
+  [ -f "$req" ] || return 0
+  [ -x "$venv/bin/pip" ] || { log "geolocate venv has no pip"; return 1; }
+  if cmp -s "$req" "$stamp" 2>/dev/null; then
+    return 0
+  fi
+  log "installing geolocate requirements"
+  if "$venv/bin/pip" install --quiet --disable-pip-version-check --only-binary=:all: -r "$req"; then
+    install -m 0644 "$req" "$stamp"
+    return 0
+  fi
+  return 1
+}
+
 install_configs() {
   local src="$1"
   [ -f "$src/alloy/config.alloy" ] || return 0
@@ -67,8 +86,14 @@ install_configs() {
   install -m 0644 "$src/fleet/solaredge.alloy" /etc/alloy/solaredge.alloy
   install -m 0644 "$src/module/metrics.alloy" /etc/alloy/module/metrics.alloy
   if [ -f "$src/geolocate/server.py" ]; then
-    install -m 0644 -o geolocate -g geolocate "$src/geolocate/server.py" /opt/solaredge/geolocate/server.py
-    systemctl try-restart solaredge-geolocate.service || true
+    # If the dependencies do not install, keep the running server.py. The new
+    # code needs the OpenTelemetry packages, so it is not swapped in without them.
+    if install_geolocate_deps "$src/geolocate/requirements.txt"; then
+      install -m 0644 -o geolocate -g geolocate "$src/geolocate/server.py" /opt/solaredge/geolocate/server.py
+      systemctl try-restart solaredge-geolocate.service || true
+    else
+      log "geolocate requirements failed; keeping the running server.py"
+    fi
   fi
   if [ -f "$src/sunspec-sim/server.py" ]; then
     install -m 0644 -o sunspec -g sunspec "$src/sunspec-sim/server.py" /opt/solaredge/sim/server.py

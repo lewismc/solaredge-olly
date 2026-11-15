@@ -238,3 +238,36 @@ loki.write "cloud" {
 		}
 	}
 }
+
+// Traces from solaredge-geolocate. The process sends OTLP/HTTP to this receiver on
+// loopback with no credentials, and Alloy adds the Grafana Cloud token on the way
+// out. The Tempo metrics-generator builds the RED series from these spans, so
+// Alloy does not build them. The batch processor is the only processor: the slim
+// Alloy build does not link the memory limiter.
+otelcol.receiver.otlp "geolocate" {
+	http {
+		endpoint = "127.0.0.1:4318"
+	}
+
+	output {
+		traces = [otelcol.processor.batch.geolocate.input]
+	}
+}
+
+otelcol.processor.batch "geolocate" {
+	output {
+		traces = [otelcol.exporter.otlphttp.grafana_cloud.input]
+	}
+}
+
+otelcol.auth.basic "grafana_cloud" {
+	username = sys.env("GRAFANA_CLOUD_OTLP_USERNAME")
+	password = sys.env("GRAFANA_CLOUD_OTLP_PASSWORD")
+}
+
+otelcol.exporter.otlphttp "grafana_cloud" {
+	client {
+		endpoint = sys.env("GRAFANA_CLOUD_OTLP_ENDPOINT")
+		auth     = otelcol.auth.basic.grafana_cloud.handler
+	}
+}
