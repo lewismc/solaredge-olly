@@ -34,7 +34,7 @@
         "range": false,
         "intervalMs": 1000,
         "maxDataPoints": 43200,
-        "expr": "label_replace(label_replace((Status{job=\"integrations/solaredge\", deployment_environment!=\"\"} == bool 7), \"asserts_env\", \"$1\", \"deployment_environment\", \"(.*)\"), \"asserts_site\", \"solaredge\", \"job\", \".*\")"
+        "expr": "label_replace(label_replace((Status{job=\"integrations/solaredge\", deployment_environment_name!=\"\"} == bool 7), \"asserts_env\", \"$1\", \"deployment_environment_name\", \"(.*)\"), \"asserts_site\", \"solaredge\", \"job\", \".*\")"
       }
     },
     {

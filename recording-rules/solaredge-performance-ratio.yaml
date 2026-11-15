@@ -27,6 +27,6 @@ spec:
         from: 10m0s
         to: 0s
       model:
-        expr: sum by (service_namespace, deployment_environment) (AC_Power{job="integrations/solaredge"} * 10 ^ AC_Power_SF{job="integrations/solaredge"}) / on() group_left max(Site_Expected_AC_Power_W{job="integrations/solaredge-geolocate"}) and on() (max(Site_Irradiance_GTI_Wm2{job="integrations/solaredge-geolocate"}) > 200)
+        expr: sum by (service_namespace, deployment_environment_name) (AC_Power{job="integrations/solaredge"} * 10 ^ AC_Power_SF{job="integrations/solaredge"}) / on() group_left max(Site_Expected_AC_Power_W{job="integrations/solaredge-geolocate"}) and on() (max(Site_Irradiance_GTI_Wm2{job="integrations/solaredge-geolocate"}) > 200)
         instant: true
         refId: Ratio

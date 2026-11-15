@@ -12,7 +12,7 @@ Alloy receives OTLP with [`otelcol.receiver.otlp`](https://grafana.com/docs/allo
 
 [geolocate/server.py](https://github.com/lewismc/solaredge-olly/blob/main/geolocate/server.py) runs two outbound calls: the ipinfo lookup and the Open-Meteo forecast. Each runs inside a manual CLIENT span. The span carries the HTTP method, the host, the path, and the status code. It does not carry the query string, the response body, the public IP, or the coordinates.
 
-The process sends OTLP/HTTP to `127.0.0.1:4318`, which is Alloy, with no credentials. Alloy adds the Grafana Cloud token on the way out. The pipeline is in [fleet/solaredge.alloy](https://github.com/lewismc/solaredge-olly/blob/main/fleet/solaredge.alloy), so Fleet Management delivers it with the rest of the collector config. The resource attributes are `service.name=solaredge-geolocate`, `service.namespace=solaredge`, and `deployment.environment=home`.
+The process sends OTLP/HTTP to `127.0.0.1:4318`, which is Alloy, with no credentials. Alloy adds the Grafana Cloud token on the way out. The pipeline is in [fleet/solaredge.alloy](https://github.com/lewismc/solaredge-olly/blob/main/fleet/solaredge.alloy), so Fleet Management delivers it with the rest of the collector config. The resource attributes are `service.name=solaredge-geolocate`, `service.namespace=solaredge`, and `deployment.environment.name=home`.
 
 Tracing is off unless `OTEL_EXPORTER_OTLP_ENDPOINT` is set. The Pi sets it in `/etc/solaredge/solaredge.env`. With the variable unset, the API has no provider and the calls are unchanged. An export failure is logged by OpenTelemetry in the background and never fails the lookup. The Mac tests showed no added delay with an unreachable endpoint.
 

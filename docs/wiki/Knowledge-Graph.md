@@ -52,11 +52,11 @@ Each join is one series that already carries both ends:
 | Collector SCRAPES Service | `prometheus_target_scrape_pool_targets` | `collector_id` and `scrape_job` are on one series, for the three jobs `integrations/solaredge`, `integrations/solaredge-geolocate`, and `integrations/raspberrypi-node`. |
 | Service SCRAPES Exporter | `up` | The Service name is `job`. The exporter name is `instance`. |
 
-`asserts_env` has to be a label of that name or the API returns 422. Scrape jobs copy it from `deployment_environment`. Alloy's own series have no `deployment_environment`, so those rules set `asserts_env` to the fixed value `home`. `label_replace` on `Modbus_Read_OK` and `up` selects `asserts_env!=""` so it does not collide with a copy that already has the label. Each relation matcher repeats the one scope key. A new edge can take 2 to 30 minutes to show. `gcx kg graph query` needs a top-level `LIMIT` of 300 or less.
+`asserts_env` has to be a label of that name or the API returns 422. Scrape jobs copy it from `deployment_environment_name`. Alloy's own series from the generated pipeline have no `deployment_environment_name`, so those rules set `asserts_env` to the fixed value `home`. `label_replace` on `Modbus_Read_OK` and `up` selects `asserts_env!=""` so it does not collide with a copy that already has the label. Each relation matcher repeats the one scope key. A new edge can take 2 to 30 minutes to show. `gcx kg graph query` needs a top-level `LIMIT` of 300 or less.
 
 There are no calls/min recording rules. Grafana's `asserts:relation:calls` draws a Service-to-Service call edge, and nothing here counts requests except the synthetic check. A recording rule would draw that edge, which is a different fact from PROBES.
 
-The stack dataset config has one filter group whose environment label is already `deployment_environment`. It was left unchanged. Editing it applies to the whole stack.
+The stack dataset config has one filter group whose environment label is still `deployment_environment`. That setting is the Knowledge Graph stack dataset, and editing it applies to the whole stack. The model rules do not depend on it: they copy `deployment_environment_name` onto `asserts_env` themselves. Built-in discovery that reads the dataset label will not see the new series until that filter group is updated.
 
 **Health rules.** Folder `knowledge-graph` (UID `alerting-tprwygwwerdz`), group `solaredge-home-health`, receiver `grafana-insight-processor`. The files are in [knowledge-graph/alertrules/](https://github.com/lewismc/solaredge-olly/tree/main/knowledge-graph/alertrules). Each expression uses `== bool`, so a healthy entity returns 0, and the threshold is above 0. `noDataState` is OK.
 
@@ -81,6 +81,6 @@ A paging rule can carry the same `asserts_*` labels and stay on the notification
 
 Build the entity name with `label_replace` when the name you want is not already a label. Repeat the single scope key on every matcher. Match an entity that has no scope, such as a SyntheticCheck, by name only.
 
-Do not add a calls recording rule to invent an edge the product will draw as a Service call. Leave the dataset environment label alone when it already matches the label your series carry. Changing it is stack-wide.
+Do not add a calls recording rule to invent an edge the product will draw as a Service call. Keep the dataset environment label on the same key the series carry. Changing it is stack-wide.
 
 Link a KPI dashboard in the UI, one dashboard per custom type, and map the variable that is the entity's identity to the entity name. The built-in Metrics tab stays empty for these types. Budget half an hour before calling a new edge missing.

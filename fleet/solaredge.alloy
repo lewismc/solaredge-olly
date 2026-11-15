@@ -11,8 +11,8 @@ import.file "solaredge_module" {
 // labels, with dots turned into underscores. service_name is one value per
 // scrape job. The regexes are anchored so integrations/solaredge does not
 // also match integrations/solaredge-geolocate. service_instance_id is the
-// host. The Knowledge Graph maps deployment_environment to its env scope,
-// so that key stays, rather than deployment_environment_name. The series
+// host. deployment_environment_name is deployment.environment.name. Model
+// rules copy that label onto asserts_env for the Knowledge Graph. The series
 // from the generated self_monitoring_metrics pipeline do not pass through here.
 prometheus.relabel "service_name" {
 	forward_to = [prometheus.relabel.common.receiver]
@@ -55,7 +55,7 @@ prometheus.relabel "common" {
 	}
 
 	rule {
-		target_label = "deployment_environment"
+		target_label = "deployment_environment_name"
 		replacement  = "home"
 	}
 
@@ -194,7 +194,7 @@ prometheus.relabel "node" {
 // API cursor is only a unix second and is keyed by the label set, so a restart
 // or a label change ships lines that were already sent.
 // Stream labels are service_name and job, plus the same resource labels the
-// metrics carry: service_namespace, deployment_environment, and
+// metrics carry: service_namespace, deployment_environment_name, and
 // service_instance_id. job matches the scrape job, so a metric and its logs
 // share a selector. The local file keeps the inverter address. The process
 // stages below mask it, and the serial, before loki.write.
@@ -219,9 +219,9 @@ loki.process "exporter" {
 
 	stage.static_labels {
 		values = {
-			service_namespace      = "solaredge",
-			deployment_environment = "home",
-			service_instance_id    = constants.hostname,
+			service_namespace           = "solaredge",
+			deployment_environment_name = "home",
+			service_instance_id         = constants.hostname,
 		}
 	}
 

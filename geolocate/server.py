@@ -74,7 +74,7 @@ def setup_tracing():
     provider = TracerProvider(resource=Resource.create({
         "service.name": "solaredge-geolocate",
         "service.namespace": "solaredge",
-        "deployment.environment": "home",
+        "deployment.environment.name": "home",
     }))
     provider.add_span_processor(BatchSpanProcessor(OTLPSpanExporter()))
     trace.set_tracer_provider(provider)

@@ -33,7 +33,7 @@ entities:
       - query: |
           label_replace(
             Inverter_Info{job="integrations/solaredge"},
-            "asserts_env", "$1", "deployment_environment", "(.*)"
+            "asserts_env", "$1", "deployment_environment_name", "(.*)"
           )
         labelValues:
           inverter: inverter
@@ -90,7 +90,7 @@ relations:
         label_replace(
           label_replace(
             Inverter_Info{job="integrations/solaredge"},
-            "asserts_env", "$1", "deployment_environment", "(.*)"
+            "asserts_env", "$1", "deployment_environment_name", "(.*)"
           ),
           "site", "solaredge-site", "job", ".*"
         )
@@ -210,8 +210,8 @@ relations:
         name: proc
         env: asserts_env
 
-  # The geolocate service describes the site. Its series have no environment label, so
-  # asserts_env comes from deployment_environment, and the fixed site label matches the
+  # The geolocate service describes the site. asserts_env is copied from
+  # deployment_environment_name, and the fixed site label matches the
   # Site's name, the same way the Site CONTAINS Inverter rule does.
   - type: DESCRIBES
     startEntityType: Service
@@ -222,7 +222,7 @@ relations:
         label_replace(
           label_replace(
             Site_Expected_AC_Power_W{job="integrations/solaredge-geolocate"},
-            "asserts_env", "$1", "deployment_environment", "(.*)"
+            "asserts_env", "$1", "deployment_environment_name", "(.*)"
           ),
           "site", "solaredge-site", "job", ".*"
         )
@@ -247,9 +247,9 @@ relations:
           prometheus_target_scrape_pool_targets{
             job="integrations/alloy",
             scrape_job=~"integrations/(solaredge|solaredge-geolocate|raspberrypi-node)",
-            deployment_environment!=""
+            deployment_environment_name!=""
           },
-          "asserts_env", "$1", "deployment_environment", "(.*)"
+          "asserts_env", "$1", "deployment_environment_name", "(.*)"
         )
       startEntityMatchers:
         name: collector_id

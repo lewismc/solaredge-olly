@@ -10,7 +10,7 @@ Redact a sensitive value in the collector, before the push. [`loki.process`](htt
 
 The exporter writes JSON lines to a file. Alloy tails that file. A healthy process logs startup once, then only Modbus errors and reconnects. Debug stays off: it writes a line every 5 seconds. Alloy remembers the byte offset, so a restart does not send the same lines again.
 
-The exporter stream carries `service_name="solaredge-exporter"`, `job="integrations/solaredge"`, `service_namespace="solaredge"`, `deployment_environment="home"`, and `service_instance_id` set to the host name. Those four resource labels are the same ones on the metrics, with the OpenTelemetry dots replaced by underscores. `job` stays the integration name, so a metrics alert and a log query name the same thing. `deployment_environment` stays that key because the Knowledge Graph maps it.
+The exporter stream carries `service_name="solaredge-exporter"`, `job="integrations/solaredge"`, `service_namespace="solaredge"`, `deployment_environment_name="home"`, and `service_instance_id` set to the host name. `deployment_environment_name` is the Prometheus spelling of `deployment.environment.name`. `job` stays the integration name, so a metrics alert and a log query name the same thing. Model rules copy `deployment_environment_name` onto `asserts_env`.
 
 ```logql
 {service_name="solaredge-exporter", job="integrations/solaredge"}
