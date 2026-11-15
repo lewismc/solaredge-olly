@@ -83,7 +83,7 @@ solaredge_module.local "exporter" {
 // The exporter stamps every sample with host:port. That string is a DHCP lease
 // and would open a new series on every renew. Rewrite it to a stable device
 // name before remote write. There is one inverter, so every address becomes
-// primary. Logs keep the address in the line body.
+// primary. The log pipeline masks the address before Loki.
 prometheus.relabel "inverter_name" {
 	forward_to = [prometheus.relabel.service_name.receiver]
 
@@ -196,8 +196,8 @@ prometheus.relabel "node" {
 // Stream labels are service_name and job, plus the same resource labels the
 // metrics carry: service_namespace, deployment_environment, and
 // service_instance_id. job matches the scrape job, so a metric and its logs
-// share a selector. The inverter address stays in the line body; it moves
-// with the DHCP lease.
+// share a selector. The local file keeps the inverter address. The process
+// stages below mask it, and the serial, before loki.write.
 
 local.file_match "exporter" {
 	path_targets = [{
@@ -223,6 +223,37 @@ loki.process "exporter" {
 			deployment_environment = "home",
 			service_instance_id    = constants.hostname,
 		}
+	}
+
+	// Count a line only when it contains an IPv4 address. The replace below
+	// needs a capture group, so the Professional Services IPv4 pattern is
+	// wrapped in one. Every match on the line is rewritten, including the
+	// listen address. The port stays, so a target still shows which socket
+	// failed. The serial token is masked because this repo treats it like
+	// the address. The local file is not rewritten.
+	stage.regex {
+		expression = `(?P<ipv4>\b(?:[0-9]{1,3}\.){3}[0-9]{1,3}\b)`
+	}
+
+	stage.metrics {
+		metric.counter {
+			name              = "ipv4_redacted_total"
+			description       = "Exporter log lines that contained an IPv4 address"
+			prefix            = "alloy_pii_"
+			source            = "ipv4"
+			action            = "inc"
+			max_idle_duration = "24h"
+		}
+	}
+
+	stage.replace {
+		expression = `(\b(?:[0-9]{1,3}\.){3}[0-9]{1,3}\b)`
+		replace    = "*IPv4*"
+	}
+
+	stage.replace {
+		expression = `Serial: ([^"\s]+)`
+		replace    = "*SERIAL*"
 	}
 
 	forward_to = [loki.write.cloud.receiver]

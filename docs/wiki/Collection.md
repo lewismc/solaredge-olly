@@ -16,7 +16,7 @@ One Modbus TCP client can hold the inverter. Stop any other logger before this e
 
 The simulator is one fake inverter, SunSpec model 101, no meters. `INVERTER_ADDRESS=sunspec-sim NUMBER_METERS=0 docker compose --profile sim up -d --build` starts it. A plain `docker compose up` does not. Do not point Compose at the live inverter while the Pi is running: two clients, and two collectors with `collector_id=solaredge` would fight over the Fleet Management pipeline.
 
-The inverter address is a DHCP lease and moves. Read it from the inverter and set `INVERTER_ADDRESS` in the Pi env file. Do not commit it. The address stays in that file and in the exporter log line body. The metrics pipeline rewrites the `inverter` label to `primary` before remote write, so a lease change does not open a new series.
+The inverter address is a DHCP lease and moves. Read it from the inverter and set `INVERTER_ADDRESS` in the Pi env file. Do not commit it. The address stays in that file and in the local exporter log. Alloy masks it before the push to Loki. The metrics pipeline rewrites the `inverter` label to `primary` before remote write, so a lease change does not open a new series.
 
 **When the exporter cannot reach the inverter.** From the host, `nc -vz <inverter-ip> 502` (or `1502`) should succeed. **When another client is connected.** Disconnect it and restart `solaredge-exporter`. **When the simulator is not read.** The exporter environment for that run must be `INVERTER_ADDRESS=sunspec-sim` and `NUMBER_METERS=0`.
 
