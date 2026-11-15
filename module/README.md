@@ -71,7 +71,7 @@ Scrapes SolarEdge exporter targets and keep-lists inverter and meter SunSpec met
 | :--- | :--- |
 | `job` | Set to the value of `argument.job_label.value` |
 
-The exporter adds an `inverter` label of `host:port` on every sample. Register values are unscaled. Multiply by ten to the power of the matching `*_SF` series to get engineering units. Example: `AC_Power * 10 ^ AC_Power_SF`.
+The exporter adds an `inverter` label of `host:port` on every sample. This module forwards that label unchanged. The fleet pipeline in this repository rewrites it to a stable name before remote write. Register values are unscaled. Multiply by ten to the power of the matching `*_SF` series to get engineering units. Example: `AC_Power * 10 ^ AC_Power_SF`.
 
 `Inverter_Info` is 1 for each inverter whose SunSpec common block was read at startup. Manufacturer, model, serial, and version are labels on that one series. Join them onto a register series at query time:
 

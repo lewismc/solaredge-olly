@@ -80,9 +80,24 @@ solaredge_module.local "exporter" {
 	exporter_address = "solaredge-exporter:2112"
 }
 
+// The exporter stamps every sample with host:port. That string is a DHCP lease
+// and would open a new series on every renew. Rewrite it to a stable device
+// name before remote write. There is one inverter, so every address becomes
+// primary. Logs keep the address in the line body.
+prometheus.relabel "inverter_name" {
+	forward_to = [prometheus.relabel.service_name.receiver]
+
+	rule {
+		source_labels = ["inverter"]
+		regex         = ".+"
+		target_label  = "inverter"
+		replacement   = "primary"
+	}
+}
+
 solaredge_module.scrape "inverter" {
 	targets    = solaredge_module.local.exporter.output
-	forward_to = [prometheus.relabel.service_name.receiver]
+	forward_to = [prometheus.relabel.inverter_name.receiver]
 }
 
 // Site location and expected yield from solaredge-geolocate. A separate job, so

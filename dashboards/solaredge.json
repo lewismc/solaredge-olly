@@ -1984,7 +1984,7 @@
                       },
                       "renameByName": {
                         "instance": "Instance",
-                        "inverter": "Inverter address",
+                        "inverter": "Inverter",
                         "job": "Job",
                         "manufacturer": "Manufacturer",
                         "model": "Model",

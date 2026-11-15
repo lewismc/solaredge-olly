@@ -14,7 +14,7 @@ Credentials are environment variables, never written into [alloy/config.alloy](h
 
 The scrape, the keep-list, and the `forward_to` receiver live in [module/metrics.alloy](https://github.com/lewismc/solaredge-olly/blob/main/module/metrics.alloy). The keep-list is `up`, `SunSpec_*`, `AC_*`, `DC_*`, `Temp_*`, `Status*`, `Inverter_Info`, `M_*`, `M2_*`, and `M3_*`. Exporter `go_*` series are dropped. The job label is `integrations/solaredge`. A second scrape, job `integrations/solaredge-geolocate`, takes `up` and `Site_*` only, so the inverter alerts and SLOs do not see the site series.
 
-Each series has an `inverter` label of `host:port`, for example `AC_Power{inverter="192.0.2.10:502"}`. Register values are unscaled. Engineering units need the matching scale factor:
+The exporter stamps every sample with an `inverter` label of `host:port`, for example `192.0.2.10:502`. That string is a DHCP lease. [fleet/solaredge.alloy](https://github.com/lewismc/solaredge-olly/blob/main/fleet/solaredge.alloy) rewrites it to `primary` before remote write, so a lease change does not open a new set of series. Register values are unscaled. Engineering units need the matching scale factor:
 
 ```promql
 AC_Power * 10 ^ AC_Power_SF

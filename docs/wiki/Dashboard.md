@@ -6,7 +6,7 @@ A [Grafana dashboard](https://grafana.com/docs/grafana/latest/dashboards/) is a 
 
 ## This stack
 
-[dashboards/solaredge.json](https://github.com/lewismc/solaredge-olly/blob/main/dashboards/solaredge.json) is a v2 dashboard named `solaredge`. Import it and pick the Prometheus and Loki data sources when asked. The `inverter` variable lists `host:port` values and defaults to all of them. Panels scope series with `job="integrations/solaredge"` and that variable, and they apply the scale factor:
+[dashboards/solaredge.json](https://github.com/lewismc/solaredge-olly/blob/main/dashboards/solaredge.json) is a v2 dashboard named `solaredge`. Import it and pick the Prometheus and Loki data sources when asked. The `inverter` variable lists the stable device name (`primary`) and defaults to all of them. A range on All still includes history from the old host:port label. Panels scope series with `job="integrations/solaredge"` and that variable, and they apply the scale factor:
 
 ```promql
 AC_Power * 10 ^ AC_Power_SF
